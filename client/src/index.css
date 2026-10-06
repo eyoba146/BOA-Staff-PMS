@@ -1,0 +1,120 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens — see docs/DESIGN_SYSTEM_AND_UI_PLAN.md
+ * Palette is an implementation choice inspired by the publicly described BoA logo
+ * (yellow flower on black). It is NOT an official Bank of Abyssinia specification.
+ */
+@theme {
+  --font-sans: 'Inter', 'Noto Sans Ethiopic', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-ink-950: #0e0e10;
+  --color-ink-900: #17171a;
+  --color-ink-800: #232327;
+  --color-ink-700: #2f2f35;
+  --color-ink-600: #45454c;
+  --color-ink-500: #6b6b75;
+  --color-ink-400: #9a9aa3;
+  --color-ink-300: #c4c4ca;
+
+  --color-gold-50: #fff9e8;
+  --color-gold-100: #fef0c7;
+  --color-gold-200: #fce08e;
+  --color-gold-300: #f9cc55;
+  --color-gold-400: #f5b82a;
+  --color-gold-500: #eba312;
+  --color-gold-600: #c98500;
+  --color-gold-700: #9c6500;
+  --color-gold-800: #7a4f05;
+
+  --color-canvas: #f5f5f2;
+
+  --shadow-xs: 0 1px 2px 0 rgb(16 16 20 / 0.04);
+  --shadow-card: 0 1px 2px 0 rgb(16 16 20 / 0.04), 0 1px 3px 0 rgb(16 16 20 / 0.03);
+
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-slide-up: slide-up 180ms ease-out;
+  --animate-slide-in-left: slide-in-left 200ms ease-out;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slide-in-left {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-canvas text-sm text-zinc-900;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ink-900);
+    outline-offset: 2px;
+  }
+
+  .on-dark :focus-visible,
+  .on-dark:focus-visible {
+    outline-color: var(--color-gold-400);
+  }
+
+  /* Native dialog base styling (modal + drawer) */
+  dialog {
+    color: inherit;
+  }
+  dialog::backdrop {
+    background-color: rgb(14 14 16 / 0.55);
+  }
+  dialog[open] {
+    animation: var(--animate-slide-up);
+  }
+  dialog.drawer[open] {
+    animation: var(--animate-slide-in-left);
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-zinc-300) transparent;
+  }
+  .scrollbar-dark {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-700) transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
