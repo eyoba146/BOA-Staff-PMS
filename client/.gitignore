@@ -24,4 +24,4 @@ dist-ssr
 *.sw?
 
 *.exe
-/backend/docs
+docs
