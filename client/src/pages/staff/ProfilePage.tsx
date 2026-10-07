@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { ShieldCheck, UserCheck, KeyRound, Phone, Mail, Building, Briefcase, Calendar } from 'lucide-react';
-import { useCurrentUser } from '@/context/AuthContext';
+import { ShieldCheck, UserCheck, KeyRound, Phone, Mail, Building, Briefcase, Calendar, Camera } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { staffService } from '@/services/staff.service';
 import { authService } from '@/services/auth.service';
 import { PageHeader } from '@/components/shared';
+import { ProfilePhotoDialog } from '@/components/profile';
 import {
   Card,
   CardHeader,
@@ -19,8 +20,13 @@ import { email, phone, required, validateForm, hasErrors, strongPassword } from 
 import { formatDate } from '@/utils/date';
 
 export function ProfilePage() {
-  const user = useCurrentUser();
+  const { user, updateUser } = useAuth();
   const { showToast } = useToast();
+
+  if (!user) return null;
+
+  // Photo dialog state
+  const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
 
   // Contact info state
   const [contactEmail, setContactEmail] = useState(user.email);
@@ -34,6 +40,25 @@ export function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string | undefined>>({});
   const [savingPassword, setSavingPassword] = useState(false);
+
+  const handleSavePhoto = async (newAvatarUrl: string | null) => {
+    try {
+      const updated = await staffService.updateMyProfile({ avatarUrl: newAvatarUrl });
+      updateUser(updated);
+      showToast({
+        tone: 'success',
+        title: 'Profile photo updated',
+        message: newAvatarUrl ? 'Your profile picture has been saved successfully.' : 'Your profile picture has been removed.',
+      });
+    } catch {
+      showToast({
+        tone: 'danger',
+        title: 'Update failed',
+        message: 'Could not save your profile picture. Please try again.',
+      });
+      throw new Error('Save photo failed');
+    }
+  };
 
   const handleUpdateContact = async (e: FormEvent) => {
     e.preventDefault();
@@ -50,10 +75,11 @@ export function ProfilePage() {
 
     setSavingContact(true);
     try {
-      await staffService.updateMyProfile({
+      const updated = await staffService.updateMyProfile({
         email: contactEmail.trim(),
         phone: contactPhone.trim(),
       });
+      updateUser(updated);
       showToast({ tone: 'success', title: 'Profile updated', message: 'Your contact details have been saved.' });
     } catch {
       showToast({ tone: 'danger', title: 'Update failed', message: 'Could not update your contact information.' });
@@ -109,8 +135,33 @@ export function ProfilePage() {
           <CardHeader title="Identity & Role" />
           <CardBody className="space-y-6">
             <div className="flex flex-col items-center text-center">
-              <Avatar name={user.fullName} size="lg" className="size-20 text-xl font-bold bg-ink-900 text-white" />
-              <h3 className="mt-3 text-base font-semibold text-zinc-900">{user.fullName}</h3>
+              <div className="relative group">
+                <Avatar
+                  name={user.fullName}
+                  src={user.avatarUrl}
+                  size="xl"
+                  className="size-24 text-2xl font-bold bg-ink-900 text-white shadow-md ring-4 ring-zinc-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPhotoDialogOpen(true)}
+                  className="absolute right-0 bottom-0 flex size-8 items-center justify-center rounded-full bg-gold-500 text-zinc-950 shadow-md ring-2 ring-white transition hover:bg-gold-400 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-gold-500"
+                  title="Update profile photo"
+                  aria-label="Update profile photo"
+                >
+                  <Camera className="size-4" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPhotoDialogOpen(true)}
+                className="mt-2 text-xs font-medium text-gold-700 hover:text-gold-800 hover:underline"
+              >
+                Change Photo
+              </button>
+
+              <h3 className="mt-2 text-base font-semibold text-zinc-900">{user.fullName}</h3>
               <p className="text-xs text-zinc-500">{user.employeeId}</p>
               <div className="mt-2.5">
                 <AccountStatusBadge status={user.status} />
@@ -239,6 +290,16 @@ export function ProfilePage() {
           </Card>
         </div>
       </div>
+
+      {/* Profile Photo Upload / Camera Modal */}
+      <ProfilePhotoDialog
+        open={photoDialogOpen}
+        onClose={() => setPhotoDialogOpen(false)}
+        currentAvatarUrl={user.avatarUrl}
+        userName={user.fullName}
+        onSave={handleSavePhoto}
+      />
     </div>
   );
 }
+

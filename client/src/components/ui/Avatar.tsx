@@ -1,22 +1,53 @@
+import { useEffect, useState } from 'react';
 import type { PerformanceStatus } from '@/types';
 import { cn } from '@/utils/cn';
 import { initials } from '@/utils/format';
 import { PERFORMANCE_STATUS_META, TONE_CLASSES } from '@/utils/status';
 
-export function Avatar({ name, size = 'md', highlight, className }: { name: string; size?: 'sm' | 'md' | 'lg'; highlight?: boolean; className?: string }) {
+export function Avatar({
+  name,
+  src,
+  size = 'md',
+  highlight,
+  className,
+}: {
+  name: string;
+  src?: string | null;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  highlight?: boolean;
+  className?: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
+  const showImg = Boolean(src && !imgError);
+
   return (
     <span
       aria-hidden
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-full font-semibold select-none',
+        'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold select-none',
         size === 'sm' && 'size-7 text-[11px]',
         size === 'md' && 'size-9 text-xs',
         size === 'lg' && 'size-14 text-base',
+        size === 'xl' && 'size-20 text-xl',
         highlight ? 'bg-gold-100 text-gold-800' : 'bg-zinc-200 text-zinc-700',
         className,
       )}
     >
-      {initials(name)}
+      {showImg ? (
+        <img
+          src={src!}
+          alt={name}
+          onError={() => setImgError(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        initials(name)
+      )}
     </span>
   );
 }

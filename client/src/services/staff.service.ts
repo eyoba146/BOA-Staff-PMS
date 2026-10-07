@@ -109,8 +109,9 @@ const mockStaffService: StaffService = {
   async updateMyProfile(req) {
     await delay(400);
     const user = requireUser();
-    user.email = req.email.trim();
-    user.phone = req.phone.trim();
+    if (req.email !== undefined) user.email = req.email.trim();
+    if (req.phone !== undefined) user.phone = req.phone.trim();
+    if (req.avatarUrl !== undefined) user.avatarUrl = req.avatarUrl;
     commit();
     return toPublicUser(user);
   },

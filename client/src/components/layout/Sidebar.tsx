@@ -62,7 +62,7 @@ export function Sidebar({ counts, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="flex items-center gap-3 border-t border-ink-800 px-4 py-3">
-        <Avatar name={user.fullName} size="sm" className="bg-ink-700 text-white" />
+        <Avatar name={user.fullName} src={user.avatarUrl} size="sm" className="bg-ink-700 text-white" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-medium text-white">{user.fullName}</p>
           <p className="truncate text-xs text-ink-500">{user.employeeId}</p>

@@ -215,7 +215,7 @@ export function StaffListPage() {
                                   to={paths.manager.staffDetail(staff.id)}
                                   className="flex items-center gap-2.5 hover:underline"
                                 >
-                                  <Avatar name={staff.fullName} size="sm" />
+                                  <Avatar name={staff.fullName} src={staff.avatarUrl} size="sm" />
                                   <div>
                                     <span className="font-semibold text-zinc-900 block">{staff.fullName}</span>
                                     <span className="text-[11px] text-zinc-400 block">{staff.employeeId}</span>
@@ -260,7 +260,7 @@ export function StaffListPage() {
                           <CardBody className="space-y-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-3">
-                                <Avatar name={staff.fullName} size="md" />
+                                <Avatar name={staff.fullName} src={staff.avatarUrl} size="md" />
                                 <div>
                                   <h4 className="text-sm font-semibold text-zinc-900">{staff.fullName}</h4>
                                   <p className="text-xs text-zinc-500">{staff.employeeId}</p>

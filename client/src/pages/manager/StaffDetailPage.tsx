@@ -137,7 +137,7 @@ export function StaffDetailPage() {
               {/* Profile Header */}
               <div className="flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between shadow-xs">
                 <div className="flex items-center gap-4">
-                  <Avatar name={staff.fullName} size="lg" className="size-16 text-lg" />
+                  <Avatar name={staff.fullName} src={staff.avatarUrl} size="lg" className="size-16 text-lg" />
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-xl font-bold text-zinc-900">{staff.fullName}</h2>

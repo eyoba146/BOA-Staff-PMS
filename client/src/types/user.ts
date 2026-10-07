@@ -20,6 +20,8 @@ export interface User {
   rejectionReason?: string | null;
   /** Number of KPIs currently assigned (manager views). */
   assignedKpiCount?: number;
+  /** Data URL or remote URL for staff profile picture. */
+  avatarUrl?: string | null;
 }
 
 export interface LoginRequest {
@@ -63,6 +65,7 @@ export interface ChangePasswordRequest {
 }
 
 export interface UpdateProfileRequest {
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
+  avatarUrl?: string | null;
 }

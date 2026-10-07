@@ -84,7 +84,7 @@ function UserMenu() {
         aria-haspopup="menu"
         className="flex items-center gap-2 rounded-md py-1 pr-1.5 pl-1 hover:bg-zinc-100"
       >
-        <Avatar name={user.fullName} size="sm" highlight />
+        <Avatar name={user.fullName} src={user.avatarUrl} size="sm" highlight />
         <span className="hidden text-left leading-tight sm:block">
           <span className="block max-w-36 truncate text-[13px] font-medium text-zinc-900">{user.fullName}</span>
           <span className="block text-xs text-zinc-500 capitalize">{user.role}</span>

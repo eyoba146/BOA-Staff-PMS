@@ -108,6 +108,7 @@ export function createSeed(): MockDb {
     rejectionReason: null,
     password: DEMO_PASSWORD,
     referenceId: `REG-${employeeId}`,
+    avatarUrl: extra.avatarUrl ?? null,
     ...extra,
   });
 

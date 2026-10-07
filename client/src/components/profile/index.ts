@@ -1,0 +1,1 @@
+export { ProfilePhotoDialog } from './ProfilePhotoDialog';
