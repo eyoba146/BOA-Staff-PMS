@@ -29,9 +29,9 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 const ICONS = { success: CheckCircle2, error: XCircle, info: Info, gold: CheckCircle2 };
 const ICON_COLORS = {
-  success: 'text-emerald-600',
-  error: 'text-red-600',
-  info: 'text-sky-600',
+  success: 'text-gold-400',
+  error: 'text-red-400',
+  info: 'text-gold-400',
   gold: 'text-gold-400',
 };
 
@@ -86,25 +86,25 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       >
         {toasts.map((t) => {
           const Icon = ICONS[t.tone];
-          const isDark = t.tone === 'gold';
+          const isError = t.tone === 'error';
 
           return (
             <div
               key={t.id}
               className={cn(
-                'pointer-events-auto flex w-full max-w-sm animate-slide-up items-start gap-3 rounded-lg p-3.5 shadow-xl transition-all',
-                isDark
-                  ? 'border border-gold-500/50 bg-ink-950 ring-1 ring-gold-500/25 text-white'
-                  : 'border border-zinc-200 bg-white text-zinc-900',
+                'pointer-events-auto flex w-full max-w-sm animate-slide-up items-start gap-3 rounded-xl p-3.5 shadow-2xl backdrop-blur-md transition-all',
+                isError
+                  ? 'border border-red-500/50 bg-ink-950 ring-1 ring-red-500/25 text-white shadow-red-950/25'
+                  : 'border border-gold-500/50 bg-ink-950 ring-1 ring-gold-500/25 text-white shadow-ink-950/60',
               )}
             >
               <Icon className={cn('mt-0.5 size-5 shrink-0', ICON_COLORS[t.tone])} aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className={cn('font-semibold text-sm', isDark ? 'text-white' : 'text-zinc-900')}>
+                <p className={cn('font-semibold text-sm tracking-tight', isError ? 'text-red-300' : 'text-gold-400')}>
                   {t.title}
                 </p>
                 {t.description && (
-                  <p className={cn('mt-0.5 text-xs', isDark ? 'text-zinc-300' : 'text-zinc-600')}>
+                  <p className="mt-0.5 text-xs text-zinc-300 leading-relaxed">
                     {t.description}
                   </p>
                 )}
@@ -113,8 +113,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => dismiss(t.id)}
                 className={cn(
-                  'rounded p-0.5 transition-colors',
-                  isDark ? 'text-zinc-400 hover:text-white' : 'text-zinc-400 hover:text-zinc-700',
+                  'rounded-md p-0.5 transition-colors',
+                  isError ? 'text-zinc-400 hover:text-red-300' : 'text-zinc-400 hover:text-gold-300',
                 )}
                 aria-label="Dismiss notification"
               >
