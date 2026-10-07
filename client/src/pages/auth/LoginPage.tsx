@@ -86,18 +86,17 @@ export function LoginPage() {
         {/* Ambient Top Glow */}
         <div className="pointer-events-none absolute -top-20 -right-20 size-48 rounded-full bg-gold-400/10 blur-3xl" />
 
-        {/* Integrated Luxury Card Header with BoA Monogram Crest */}
+        {/* Integrated Luxury Card Header with Official BoA Logo */}
         <div className="relative flex items-center justify-between border-b border-zinc-100 pb-5">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-gold-400 shadow-sm ring-2 ring-gold-400/30">
-              <svg viewBox="0 0 24 24" className="size-6" fill="none">
-                <path d="M12 3.5 19.5 12 12 20.5 4.5 12Z" stroke="#F5B82A" strokeWidth="2" strokeLinejoin="round" />
-                <path d="M12 8.5 15 12l-3 3.5L9 12Z" fill="#F5B82A" />
-              </svg>
-            </div>
+          <div className="flex items-center gap-3.5">
+            <img
+              src="/abyssinia-logo.png"
+              alt="Bank of Abyssinia"
+              className="h-12 w-auto shrink-0 object-contain"
+            />
             <div>
-              <p className="text-[11px] font-bold tracking-wider text-zinc-400 uppercase">Bank of Abyssinia</p>
-              <p className="text-sm font-semibold text-zinc-900">Branch Operations Portal</p>
+              <p className="text-[11.5px] font-bold tracking-wider text-zinc-400 uppercase">Bank of Abyssinia</p>
+              <p className="text-[14.5px] font-semibold text-zinc-900">Branch Operations Portal</p>
             </div>
           </div>
 
