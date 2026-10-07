@@ -1,12 +1,17 @@
-import { useState, useCallback, type FormEvent } from 'react';
+import { useState, useCallback, useEffect, type FormEvent } from 'react';
 import {
   RotateCcw,
   KeyRound,
   ShieldCheck,
+  Building2,
+  Hash,
+  Save,
+  CheckCircle2,
 } from 'lucide-react';
 import { settingsService } from '@/services/settings.service';
 import { authService } from '@/services/auth.service';
 import { env } from '@/config/env';
+import { useAuth } from '@/context/AuthContext';
 import { useAsync } from '@/hooks/useAsync';
 import { useToast } from '@/context/ToastContext';
 import { PageHeader, AsyncBoundary, ConfirmDialog, PendingValidationNotice } from '@/components/shared';
@@ -23,6 +28,7 @@ import { required, strongPassword, validateForm, hasErrors } from '@/utils/valid
 import type { SystemSettings } from '@/types';
 
 export function SettingsPage() {
+  const { user, updateUser } = useAuth();
   const { showToast } = useToast();
 
   const loadSettings = useCallback(async () => {
@@ -30,6 +36,12 @@ export function SettingsPage() {
   }, []);
 
   const state = useAsync(loadSettings, [loadSettings]);
+
+  // Branch Information state
+  const [branchName, setBranchName] = useState('');
+  const [branchCode, setBranchCode] = useState('');
+  const [branchErrors, setBranchErrors] = useState<Record<string, string | undefined>>({});
+  const [savingBranch, setSavingBranch] = useState(false);
 
   // Thresholds state
   const [onTargetMin, setOnTargetMin] = useState<number>(85);
@@ -54,13 +66,68 @@ export function SettingsPage() {
   const [resetting, setResetting] = useState(false);
 
   // Sync state when loaded
-  const handleDataLoaded = useCallback((settings: SystemSettings) => {
-    setOnTargetMin(settings.thresholds.onTargetMin);
-    setNeedsAttentionMin(settings.thresholds.needsAttentionMin);
-    setAllowEdit(settings.entryPolicy.allowEditSubmitted);
-    setBackdateDays(settings.entryPolicy.backdateDays);
-    setWeightingEnabled(settings.weightingEnabled);
-  }, []);
+  useEffect(() => {
+    if (state.data) {
+      setBranchName(state.data.branchName);
+      setBranchCode(state.data.branchCode);
+      setOnTargetMin(state.data.thresholds.onTargetMin);
+      setNeedsAttentionMin(state.data.thresholds.needsAttentionMin);
+      setAllowEdit(state.data.entryPolicy.allowEditSubmitted);
+      setBackdateDays(state.data.entryPolicy.backdateDays);
+      setWeightingEnabled(state.data.weightingEnabled);
+    }
+  }, [state.data]);
+
+  const handleSaveBranch = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!state.data) return;
+
+    const trimmedName = branchName.trim();
+    const trimmedCode = branchCode.trim().toUpperCase();
+
+    const errs: Record<string, string | undefined> = {};
+    if (!trimmedName) {
+      errs.branchName = 'Branch name is required.';
+    } else if (trimmedName.length < 3) {
+      errs.branchName = 'Branch name must be at least 3 characters.';
+    }
+
+    if (!trimmedCode) {
+      errs.branchCode = 'Branch code is required.';
+    } else if (trimmedCode.length < 2) {
+      errs.branchCode = 'Branch code must be at least 2 characters.';
+    }
+
+    setBranchErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setSavingBranch(true);
+    try {
+      const updated: SystemSettings = {
+        ...state.data,
+        branchName: trimmedName,
+        branchCode: trimmedCode,
+      };
+      await settingsService.update(updated);
+      state.setData(updated);
+      if (user) {
+        updateUser({ ...user, branchName: trimmedName });
+      }
+      showToast({
+        tone: 'success',
+        title: 'Branch information updated',
+        message: `Branch profile updated to "${trimmedName}" (${trimmedCode}).`,
+      });
+    } catch {
+      showToast({
+        tone: 'danger',
+        title: 'Failed to save',
+        message: 'Could not update branch information.',
+      });
+    } finally {
+      setSavingBranch(false);
+    }
+  };
 
   const handleSaveThresholds = async (e: FormEvent) => {
     e.preventDefault();
@@ -182,28 +249,81 @@ export function SettingsPage() {
 
       <AsyncBoundary state={state}>
         {(settings) => {
-          // Initialize form fields once when loaded
-          if (onTargetMin !== settings.thresholds.onTargetMin && !savingThresholds) {
-            handleDataLoaded(settings);
-          }
-
           return (
             <div className="space-y-6">
               {/* Branch Information */}
               <Card>
                 <CardHeader
                   title="Branch Information"
-                  description="Primary branch identification metadata (read-only for branch instance)."
+                  description="Primary branch identification and operational instance configuration."
+                  actions={
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                      <CheckCircle2 className="size-3.5 text-emerald-600" />
+                      Active Branch Instance
+                    </span>
+                  }
                 />
-                <CardBody className="grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-md border border-zinc-100 bg-zinc-50 p-3">
-                    <p className="text-xs text-zinc-500">Branch Name</p>
-                    <p className="mt-1 font-semibold text-zinc-900">{settings.branchName}</p>
-                  </div>
-                  <div className="rounded-md border border-zinc-100 bg-zinc-50 p-3">
-                    <p className="text-xs text-zinc-500">Branch Code</p>
-                    <p className="mt-1 font-semibold text-zinc-900">{settings.branchCode}</p>
-                  </div>
+                <CardBody className="space-y-4">
+                  <p className="text-xs text-zinc-500 leading-relaxed">
+                    As branch administrator, you can update this branch's official name and branch code. Changes immediately reflect in top navigation, employee profiles, and registration records.
+                  </p>
+
+                  <form onSubmit={handleSaveBranch} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field
+                        label="Branch Name"
+                        error={branchErrors.branchName}
+                        hint="Official name of this branch (e.g. Finfine Main Branch, Bole Medhanialem Branch)."
+                        required
+                      >
+                        <Input
+                          value={branchName}
+                          onChange={(e) => {
+                            setBranchName(e.target.value);
+                            if (branchErrors.branchName) setBranchErrors((err) => ({ ...err, branchName: undefined }));
+                          }}
+                          leftIcon={<Building2 className="size-4 text-zinc-400" />}
+                          placeholder="e.g. Bole Medhanialem Branch"
+                          autoComplete="off"
+                        />
+                      </Field>
+
+                      <Field
+                        label="Branch Code"
+                        error={branchErrors.branchCode}
+                        hint="Official BoA branch identifier or ledger code (e.g. BOA-001, BOLE-104)."
+                        required
+                      >
+                        <Input
+                          value={branchCode}
+                          onChange={(e) => {
+                            setBranchCode(e.target.value.toUpperCase());
+                            if (branchErrors.branchCode) setBranchErrors((err) => ({ ...err, branchCode: undefined }));
+                          }}
+                          leftIcon={<Hash className="size-4 text-zinc-400" />}
+                          placeholder="e.g. BOA-001"
+                          autoComplete="off"
+                          className="font-mono uppercase"
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-zinc-100 pt-3">
+                      <div className="text-[11.5px] text-zinc-400">
+                        Current active branch:{' '}
+                        <span className="font-semibold text-zinc-700">{settings.branchName}</span>{' '}
+                        <span className="font-mono text-zinc-500">({settings.branchCode})</span>
+                      </div>
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        loading={savingBranch}
+                        leftIcon={<Save className="size-4" />}
+                      >
+                        Save Branch Information
+                      </Button>
+                    </div>
+                  </form>
                 </CardBody>
               </Card>
 

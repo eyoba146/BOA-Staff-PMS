@@ -34,7 +34,7 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <div className="min-h-dvh lg:pl-64">
+    <div className="min-h-dvh lg:pl-72">
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-ink-900 px-3 py-2 text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
@@ -42,14 +42,14 @@ export function AppLayout() {
         Skip to content
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 lg:block">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 lg:block">
         <Sidebar counts={counts} />
       </aside>
 
       <dialog
         ref={drawerRef}
         aria-label="Navigation menu"
-        className="drawer m-0 h-dvh max-h-none w-72 max-w-[85vw] bg-ink-950 p-0"
+        className="drawer m-0 h-dvh max-h-none w-80 max-w-[85vw] bg-ink-950 p-0"
         onCancel={(e) => {
           e.preventDefault();
           setDrawerOpen(false);

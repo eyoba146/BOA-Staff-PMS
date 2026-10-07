@@ -1,4 +1,4 @@
-import { Eye, EyeOff, IdCard, KeyRound, LogIn } from 'lucide-react';
+import { Eye, EyeOff, IdCard, KeyRound, LogIn, Sparkles, Lock, UserCheck, Briefcase } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Button, Checkbox, Field, Input } from '@/components/ui';
@@ -8,11 +8,12 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { toApiError } from '@/services/http/apiClient';
 import { homeFor, paths } from '@/routes/paths';
+import { cn } from '@/utils/cn';
 import { hasErrors, required, validateForm } from '@/utils/validation';
 
 const DEMO_ACCOUNTS = [
-  { id: 'BOA-M001', label: 'Branch Manager' },
-  { id: 'BOA-S001', label: 'Staff member' },
+  { id: 'BOA-M001', label: 'Branch Manager', icon: Briefcase, roleDesc: 'Managerial oversight & approvals' },
+  { id: 'BOA-S001', label: 'Customer Service Officer', icon: UserCheck, roleDesc: 'Daily KPI entries & tracking' },
 ];
 
 /** AUTH-01 — Login */
@@ -55,114 +56,202 @@ export function LoginPage() {
 
   const showStatusLink = formError && ['ACCOUNT_PENDING', 'ACCOUNT_REJECTED'].includes(formError.code);
 
+  const activeDemoId = DEMO_ACCOUNTS.find((a) => a.id === values.identifier)?.id;
+
   return (
     <AuthLayout
-      title="Sign in"
-      description="Use your employee ID and password to access the system."
       footer={
-        <>
-          New staff member?{' '}
-          <Link to={paths.register} className="font-medium text-zinc-900 underline-offset-4 hover:underline">
-            Request an account
-          </Link>
-          <span className="mx-2 text-zinc-300">·</span>
-          <Link to={paths.accountStatus} className="font-medium text-zinc-900 underline-offset-4 hover:underline">
-            Check registration status
-          </Link>
-        </>
-      }
-    >
-      <form onSubmit={onSubmit} noValidate className="space-y-5 rounded-lg border border-zinc-200 bg-white p-5 shadow-card sm:p-6">
-        {sessionNotice && !formError && <Alert tone="warning">{sessionNotice}</Alert>}
-        {formError && (
-          <Alert
-            tone="danger"
-            action={
-              showStatusLink ? (
-                <Link to={paths.accountStatus} className="text-[13px] font-medium underline underline-offset-2">
-                  View status
-                </Link>
-              ) : undefined
-            }
-          >
-            {formError.message}
-          </Alert>
-        )}
-
-        <Field label="Employee ID or username" error={errors.identifier} required>
-          <Input
-            name="identifier"
-            autoComplete="username"
-            autoFocus
-            leftIcon={<IdCard />}
-            placeholder="e.g. BOA-S001"
-            value={values.identifier}
-            onChange={(e) => setValues((v) => ({ ...v, identifier: e.target.value }))}
-          />
-        </Field>
-
-        <Field
-          label="Password"
-          error={errors.password}
-          required
-          labelAction={
-            <Link to={paths.forgotPassword} className="text-[13px] font-medium text-zinc-600 hover:text-zinc-900 hover:underline">
-              Forgot password?
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-600">
+            <span>New branch staff member?</span>
+            <Link to={paths.register} className="font-semibold text-zinc-900 underline-offset-4 hover:text-gold-700 hover:underline">
+              Request an account
             </Link>
-          }
-        >
-          <Input
-            name="password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            leftIcon={<KeyRound />}
-            value={values.password}
-            onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
-            suffix={
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="rounded p-0.5 text-zinc-500 hover:text-zinc-800"
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            }
-          />
-        </Field>
-
-        <Checkbox
-          checked={remember}
-          onChange={(e) => setRemember(e.target.checked)}
-          label="Keep me signed in on this device"
-          description="Only on personal or approved workstations, if permitted by bank policy."
-        />
-
-        <Button type="submit" size="lg" fullWidth loading={submitting} leftIcon={<LogIn className="size-4" />}>
-          Sign in
-        </Button>
-      </form>
-
-      {env.useMockApi && (
-        <div className="mt-4 rounded-lg border border-dashed border-violet-300 bg-violet-50/60 p-4 text-[13px] text-violet-900">
-          <p className="font-medium">Demo accounts (mock mode only)</p>
-          <p className="mt-0.5 text-violet-800/80">
-            Password for all demo accounts: <code className="rounded bg-white px-1 py-0.5 font-mono text-xs">Demo@1234</code>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {DEMO_ACCOUNTS.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => setValues({ identifier: a.id, password: 'Demo@1234' })}
-                className="rounded-md border border-violet-200 bg-white px-2.5 py-1.5 text-xs font-medium text-violet-800 hover:border-violet-300 hover:bg-violet-50"
-              >
-                {a.label} · {a.id}
-              </button>
-            ))}
+            <span className="text-zinc-300">·</span>
+            <Link to={paths.accountStatus} className="font-semibold text-zinc-900 underline-offset-4 hover:text-gold-700 hover:underline">
+              Check registration status
+            </Link>
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-400">
+            <Lock className="size-3 text-zinc-400" />
+            <span>256-bit TLS Encrypted · Internal Branch Terminal Only</span>
           </div>
         </div>
-      )}
+      }
+    >
+      <div className="relative overflow-hidden rounded-2xl border border-zinc-200/90 bg-white p-7 sm:p-10 shadow-[0_20px_60px_-15px_rgba(14,14,16,0.07),0_2px_8px_rgba(14,14,16,0.04)]">
+        {/* Top Gold Gradient Brand Accent Ribbon */}
+        <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-gold-600 via-gold-400 to-gold-500" />
+
+        {/* Ambient Top Glow */}
+        <div className="pointer-events-none absolute -top-20 -right-20 size-48 rounded-full bg-gold-400/10 blur-3xl" />
+
+        {/* Integrated Luxury Card Header with BoA Monogram Crest */}
+        <div className="relative flex items-center justify-between border-b border-zinc-100 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-gold-400 shadow-sm ring-2 ring-gold-400/30">
+              <svg viewBox="0 0 24 24" className="size-6" fill="none">
+                <path d="M12 3.5 19.5 12 12 20.5 4.5 12Z" stroke="#F5B82A" strokeWidth="2" strokeLinejoin="round" />
+                <path d="M12 8.5 15 12l-3 3.5L9 12Z" fill="#F5B82A" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold tracking-wider text-zinc-400 uppercase">Bank of Abyssinia</p>
+              <p className="text-sm font-semibold text-zinc-900">Branch Operations Portal</p>
+            </div>
+          </div>
+
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/90 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800">
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Terminal Online
+          </span>
+        </div>
+
+        {/* Headline */}
+        <div className="mt-5">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-950 sm:text-[25px]">Staff Workstation Sign In</h1>
+          <p className="mt-1 text-[13.5px] text-zinc-500 leading-relaxed">
+            Enter your official branch credentials to access operational performance records.
+          </p>
+        </div>
+
+        {/* Role Quick-Switch Tabs (replaces clunky demo box) */}
+        {env.useMockApi && (
+          <div className="mt-5 rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700">
+                <Sparkles className="size-3.5 text-gold-600" />
+                Quick Role Access
+              </span>
+              <span className="text-[11px] text-zinc-400">
+                Pass: <code className="font-mono text-zinc-600">Demo@1234</code>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {DEMO_ACCOUNTS.map((a) => {
+                const isSelected = activeDemoId === a.id;
+                const Icon = a.icon;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => {
+                      setValues({ identifier: a.id, password: 'Demo@1234' });
+                      setErrors({});
+                      setFormError(null);
+                    }}
+                    className={cn(
+                      'group flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all',
+                      isSelected
+                        ? 'border-gold-500/80 bg-white shadow-xs ring-2 ring-gold-500/20'
+                        : 'border-zinc-200 bg-white/70 hover:border-zinc-300 hover:bg-white text-zinc-600 hover:text-zinc-900',
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'flex size-7 shrink-0 items-center justify-center rounded-md transition-colors',
+                        isSelected ? 'bg-gold-50 text-gold-700' : 'bg-zinc-100 text-zinc-500 group-hover:text-zinc-700',
+                      )}
+                    >
+                      <Icon className="size-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={cn('truncate text-xs font-semibold', isSelected ? 'text-zinc-950' : 'text-zinc-700')}>
+                        {a.label}
+                      </p>
+                      <p className="font-mono text-[10.5px] text-zinc-400">{a.id}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={onSubmit} noValidate className="mt-5 space-y-4.5">
+          {sessionNotice && !formError && <Alert tone="warning">{sessionNotice}</Alert>}
+          {formError && (
+            <Alert
+              tone="danger"
+              action={
+                showStatusLink ? (
+                  <Link to={paths.accountStatus} className="text-[13px] font-medium underline underline-offset-2">
+                    View status
+                  </Link>
+                ) : undefined
+              }
+            >
+              {formError.message}
+            </Alert>
+          )}
+
+          <Field label="Employee ID or Username" error={errors.identifier} required>
+            <Input
+              name="identifier"
+              autoComplete="username"
+              autoFocus
+              leftIcon={<IdCard className="size-4 text-zinc-400" />}
+              placeholder="e.g. BOA-M001 or BOA-S001"
+              value={values.identifier}
+              onChange={(e) => setValues((v) => ({ ...v, identifier: e.target.value }))}
+              className="h-12 rounded-xl border-zinc-200/90 bg-zinc-50/50 text-sm focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+            />
+          </Field>
+
+          <Field
+            label="Password"
+            error={errors.password}
+            required
+            labelAction={
+              <Link to={paths.forgotPassword} className="text-xs font-semibold text-gold-700 hover:text-gold-800 hover:underline">
+                Forgot password?
+              </Link>
+            }
+          >
+            <Input
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              leftIcon={<KeyRound className="size-4 text-zinc-400" />}
+              value={values.password}
+              onChange={(e) => setValues((v) => ({ ...v, password: e.target.value }))}
+              className="h-12 rounded-xl border-zinc-200/90 bg-zinc-50/50 text-sm focus:bg-white focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20"
+              suffix={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="rounded p-1 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              }
+            />
+          </Field>
+
+          <div className="pt-0.5">
+            <Checkbox
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              label={<span className="font-medium text-zinc-800">Remember this workstation</span>}
+              description="Keep my session securely active on approved branch terminals."
+            />
+          </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            fullWidth
+            loading={submitting}
+            className="h-12 rounded-xl bg-ink-950 hover:bg-ink-900 text-white font-semibold text-sm shadow-md hover:shadow-xl shadow-ink-950/10 transition-all active:scale-[0.99] gap-2.5 group"
+          >
+            <LogIn className="size-4 text-gold-400 transition-transform group-hover:translate-x-1" />
+            <span>Sign In to Terminal</span>
+          </Button>
+        </form>
+      </div>
     </AuthLayout>
   );
 }

@@ -28,14 +28,41 @@ const mockSettingsService: SettingsService = {
   async update(s) {
     await delay(450);
     requireManager();
+    const cleanBranchName = s.branchName?.trim();
+    const cleanBranchCode = s.branchCode?.trim().toUpperCase();
+
+    if (!cleanBranchName) {
+      throw mockError(422, 'VALIDATION', 'Branch name is required.', {
+        branchName: 'Branch name is required.',
+      });
+    }
+    if (!cleanBranchCode) {
+      throw mockError(422, 'VALIDATION', 'Branch code is required.', {
+        branchCode: 'Branch code is required.',
+      });
+    }
     if (s.thresholds.needsAttentionMin >= s.thresholds.onTargetMin) {
       throw mockError(422, 'VALIDATION', 'Thresholds are inconsistent.', {
         needsAttentionMin: 'Must be lower than the "On target" minimum.',
       });
     }
-    getDb().settings = clone(s);
+
+    const updatedSettings: SystemSettings = {
+      ...clone(s),
+      branchName: cleanBranchName,
+      branchCode: cleanBranchCode,
+    };
+
+    const db = getDb();
+    db.settings = updatedSettings;
+
+    // Propagate updated branchName to all users in the mock database
+    for (const u of db.users) {
+      u.branchName = cleanBranchName;
+    }
+
     commit();
-    return clone(s);
+    return clone(updatedSettings);
   },
   async resetDemoData() {
     await delay(300);
