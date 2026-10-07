@@ -8,13 +8,15 @@ import {
   ChevronLeft,
   Building2,
   Lock,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useCurrentUser } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { chatService } from '@/services/chat.service';
 import { staffService } from '@/services/staff.service';
 import { useAsync } from '@/hooks/useAsync';
-import { PageHeader } from '@/components/shared';
+import { PageHeader, ConfirmDialog } from '@/components/shared';
 import { NewConversationDialog } from '@/components/chat/NewConversationDialog';
 import { Avatar, Button, Input, SkeletonRows, EmptyState } from '@/components/ui';
 import type { ChatMessage, User } from '@/types';
@@ -31,6 +33,15 @@ export function ChatPage() {
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
+
+  // Editing state
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Deleting state
+  const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Mobile pane toggling: true = show thread on mobile
   const [showThreadOnMobile, setShowThreadOnMobile] = useState(false);
@@ -64,6 +75,8 @@ export function ChatPage() {
     if (!activeConvId) return;
     let cancelled = false;
     setLoadingMessages(true);
+    setEditingMsgId(null);
+    setEditingText('');
     void chatService.getMessages(activeConvId).then((res) => {
       if (!cancelled) {
         setMessages(res);
@@ -108,6 +121,71 @@ export function ChatPage() {
       showToast({ tone: 'danger', title: 'Failed to send', message: 'Could not deliver your message.' });
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleStartEdit = (msg: ChatMessage) => {
+    setEditingMsgId(msg.id);
+    setEditingText(msg.body);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMsgId(null);
+    setEditingText('');
+  };
+
+  const handleSaveEdit = async (msgId: string) => {
+    if (!activeConvId || !editingText.trim() || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const updated = await chatService.editMessage(activeConvId, msgId, editingText.trim());
+      setMessages((prev) => prev.map((m) => (m.id === msgId ? updated : m)));
+
+      // Sync conversation snippet if it's the last message
+      convsState.setData((prev) =>
+        prev?.map((c) =>
+          c.id === activeConvId && c.lastMessage?.id === msgId
+            ? { ...c, lastMessage: updated }
+            : c,
+        ),
+      );
+      handleCancelEdit();
+      showToast({ tone: 'gold', title: 'Message updated', message: 'Your changes have been saved to the conversation.' });
+    } catch {
+      showToast({ tone: 'danger', title: 'Edit failed', message: 'Could not update your message.' });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!activeConvId || !deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await chatService.deleteMessage(activeConvId, deleteTarget.id);
+      const remainingMessages = messages.filter((m) => m.id !== deleteTarget.id);
+      setMessages(remainingMessages);
+
+      // Sync conversation snippet if this was the last message
+      convsState.setData((prev) =>
+        prev?.map((c) => {
+          if (c.id === activeConvId && c.lastMessage?.id === deleteTarget.id) {
+            const newLast = remainingMessages.at(-1) ?? null;
+            return {
+              ...c,
+              lastMessage: newLast,
+              updatedAt: newLast?.sentAt ?? c.updatedAt,
+            };
+          }
+          return c;
+        }),
+      );
+      setDeleteTarget(null);
+      showToast({ tone: 'gold', title: 'Message deleted', message: 'The message was removed from the conversation.' });
+    } catch {
+      showToast({ tone: 'danger', title: 'Delete failed', message: 'Could not delete message.' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -301,13 +379,16 @@ export function ChatPage() {
                 ) : (
                   messages.map((msg, i) => {
                     const isMe = msg.senderId === currentUser.id;
+                    const canEdit = isMe;
+                    const canDelete = isMe || currentUser.role === 'manager';
                     const prevMsg = messages[i - 1];
                     const isSameSender = prevMsg && prevMsg.senderId === msg.senderId;
+                    const isEditingThis = editingMsgId === msg.id;
 
                     return (
                       <div
                         key={msg.id}
-                        className={cn('flex flex-col', isMe ? 'items-end' : 'items-start')}
+                        className={cn('group relative flex flex-col', isMe ? 'items-end' : 'items-start')}
                       >
                         {!isSameSender && !isMe && (
                           <span className="mb-1 text-[11px] font-medium text-zinc-600">
@@ -315,24 +396,155 @@ export function ChatPage() {
                           </span>
                         )}
 
-                        <div
-                          className={cn(
-                            'max-w-[80%] rounded-lg px-3.5 py-2 text-xs leading-relaxed shadow-xs',
-                            isMe
-                              ? 'bg-ink-900 text-white rounded-br-none'
-                              : 'bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-bl-none',
-                          )}
-                        >
-                          <p className="whitespace-pre-line">{msg.body}</p>
-                          <span
+                        {isEditingThis ? (
+                          <div
                             className={cn(
-                              'mt-1 block text-[10px] text-right',
-                              isMe ? 'text-zinc-400' : 'text-zinc-500',
+                              'w-full max-w-md rounded-lg p-3 shadow-md transition-all',
+                              isMe
+                                ? 'bg-ink-900 border border-gold-500/50 ring-1 ring-gold-500/30 text-white'
+                                : 'bg-white border border-zinc-300 text-zinc-900',
                             )}
                           >
-                            {formatDateTime(msg.sentAt).split(',')[1]?.trim() || ''}
-                          </span>
-                        </div>
+                            <div className="mb-1.5 flex items-center justify-between">
+                              <span
+                                className={cn(
+                                  'flex items-center gap-1.5 text-[11px] font-semibold',
+                                  isMe ? 'text-gold-400' : 'text-zinc-700',
+                                )}
+                              >
+                                <Pencil className="size-3 text-gold-500" />
+                                Edit Message
+                              </span>
+                              <span
+                                className={cn(
+                                  'text-[10px]',
+                                  isMe ? 'text-ink-400' : 'text-zinc-400',
+                                )}
+                              >
+                                Enter to save • Esc to cancel
+                              </span>
+                            </div>
+
+                            <textarea
+                              rows={2}
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  void handleSaveEdit(msg.id);
+                                } else if (e.key === 'Escape') {
+                                  handleCancelEdit();
+                                }
+                              }}
+                              autoFocus
+                              className={cn(
+                                'w-full resize-none rounded-md p-2 text-xs transition-colors focus:outline-none focus:ring-1',
+                                isMe
+                                  ? 'bg-ink-800 border border-ink-700 text-white placeholder-ink-400 focus:border-gold-500 focus:ring-gold-500'
+                                  : 'bg-white border border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-ink-900 focus:ring-ink-900',
+                              )}
+                            />
+
+                            <div className="mt-2.5 flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelEdit}
+                                disabled={savingEdit}
+                                className={cn(
+                                  'rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                                  isMe
+                                    ? 'text-ink-300 hover:text-white hover:bg-ink-800'
+                                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100',
+                                )}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleSaveEdit(msg.id)}
+                                disabled={savingEdit || !editingText.trim()}
+                                className="flex items-center gap-1 rounded bg-gold-500 px-3 py-1 text-xs font-semibold text-ink-950 shadow-xs transition hover:bg-gold-400 active:scale-95 disabled:opacity-50"
+                              >
+                                {savingEdit ? 'Saving...' : 'Save Changes'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className={cn(
+                              'flex items-center gap-1.5',
+                              isMe ? 'flex-row' : 'flex-row-reverse',
+                            )}
+                          >
+                            {/* Quick Action buttons (Edit & Delete on hover/focus) */}
+                            {(canEdit || canDelete) && (
+                              <div
+                                className={cn(
+                                  'flex items-center gap-0.5 rounded-md border border-zinc-200/90 bg-white px-1 py-0.5 shadow-xs transition-opacity',
+                                  'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100',
+                                )}
+                              >
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(msg)}
+                                    className="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-700"
+                                    title="Edit message"
+                                    aria-label="Edit message"
+                                  >
+                                    <Pencil className="size-3.5" />
+                                  </button>
+                                )}
+                                {canDelete && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteTarget(msg)}
+                                    className="rounded p-1 text-zinc-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                                    title={isMe ? 'Delete message' : 'Delete message (Moderation)'}
+                                    aria-label="Delete message"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Message Bubble */}
+                            <div
+                              className={cn(
+                                'max-w-[80%] rounded-lg px-3.5 py-2 text-xs leading-relaxed shadow-xs transition-all',
+                                isMe
+                                  ? cn(
+                                      'bg-ink-900 text-white rounded-br-none',
+                                      msg.editedAt && 'border border-gold-500/40 ring-1 ring-gold-500/25',
+                                    )
+                                  : cn(
+                                      'bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-bl-none',
+                                      msg.editedAt && 'border-l-2 border-l-gold-500',
+                                    ),
+                              )}
+                            >
+                              <p className="whitespace-pre-line">{msg.body}</p>
+                              <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px]">
+                                {msg.editedAt && (
+                                  <span
+                                    className={cn(
+                                      'inline-flex items-center gap-0.5 font-medium',
+                                      isMe ? 'text-gold-400 font-semibold' : 'text-gold-600 font-medium',
+                                    )}
+                                  >
+                                    <Pencil className="size-2.5 inline" />
+                                    (edited)
+                                  </span>
+                                )}
+                                <span className={isMe ? 'text-zinc-400' : 'text-zinc-500'}>
+                                  {formatDateTime(msg.sentAt).split(',')[1]?.trim() || ''}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -379,6 +591,19 @@ export function ChatPage() {
         currentUserId={currentUser.id}
         onSelectUser={handleStartConversationWithUser}
       />
+
+      {/* Delete Message Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete Message"
+        description="Are you sure you want to delete this message? This message will be permanently removed for all participants."
+        confirmLabel="Delete Message"
+        destructive
+        loading={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
+

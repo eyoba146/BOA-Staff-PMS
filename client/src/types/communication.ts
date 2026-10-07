@@ -66,6 +66,8 @@ export interface ChatMessage {
   senderName: string;
   body: string;
   sentAt: ISODateTime;
+  editedAt?: ISODateTime | null;
+  isDeleted?: boolean;
 }
 
 export interface Conversation {

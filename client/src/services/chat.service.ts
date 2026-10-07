@@ -14,6 +14,8 @@ export interface ChatService {
   listConversations(): Promise<Conversation[]>;
   getMessages(conversationId: string): Promise<ChatMessage[]>;
   sendMessage(conversationId: string, body: string): Promise<ChatMessage>;
+  editMessage(conversationId: string, messageId: string, body: string): Promise<ChatMessage>;
+  deleteMessage(conversationId: string, messageId: string): Promise<void>;
   /** Find or create a direct conversation with another user. */
   startDirect(userId: string): Promise<Conversation>;
 }
@@ -23,6 +25,8 @@ const httpChatService: ChatService = {
   listConversations: () => api.get<Conversation[]>('/conversations'),
   getMessages: (id) => api.get<ChatMessage[]>(`/conversations/${id}/messages`),
   sendMessage: (id, body) => api.post<ChatMessage>(`/conversations/${id}/messages`, { body }),
+  editMessage: (convId, msgId, body) => api.patch<ChatMessage>(`/conversations/${convId}/messages/${msgId}`, { body }),
+  deleteMessage: (convId, msgId) => api.delete<void>(`/conversations/${convId}/messages/${msgId}`),
   startDirect: (userId) => api.post<Conversation>('/conversations', { type: 'direct', participantId: userId }),
 };
 
@@ -84,6 +88,36 @@ const mockChatService: ChatService = {
     findMine(id, user.id).lastReadAt[user.id] = m.sentAt;
     commit();
     return m;
+  },
+  async editMessage(convId, msgId, body) {
+    await delay(150);
+    const user = requireUser();
+    findMine(convId, user.id);
+    const text = body.trim();
+    if (!text) throw mockError(422, 'VALIDATION', 'Message cannot be empty.');
+    if (text.length > 2000) throw mockError(422, 'VALIDATION', 'Message is too long (max 2000 characters).');
+    const db = getDb();
+    const msg = db.messages.find((m) => m.id === msgId && m.conversationId === convId);
+    if (!msg) throw mockError(404, 'NOT_FOUND', 'Message not found.');
+    if (msg.senderId !== user.id) throw mockError(403, 'FORBIDDEN', 'You can only edit your own messages.');
+    msg.body = text;
+    msg.editedAt = nowISO();
+    commit();
+    return msg;
+  },
+  async deleteMessage(convId, msgId) {
+    await delay(150);
+    const user = requireUser();
+    findMine(convId, user.id);
+    const db = getDb();
+    const idx = db.messages.findIndex((m) => m.id === msgId && m.conversationId === convId);
+    if (idx === -1) throw mockError(404, 'NOT_FOUND', 'Message not found.');
+    const msg = db.messages[idx];
+    if (msg.senderId !== user.id && user.role !== 'manager') {
+      throw mockError(403, 'FORBIDDEN', 'You can only delete your own messages.');
+    }
+    db.messages.splice(idx, 1);
+    commit();
   },
   async startDirect(userId) {
     await delay(200);
