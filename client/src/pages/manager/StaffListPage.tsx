@@ -15,7 +15,7 @@ import {
 import { staffService } from '@/services/staff.service';
 import { useAsync } from '@/hooks/useAsync';
 import { useToast } from '@/context/ToastContext';
-import { PageHeader, AsyncBoundary, ConfirmDialog } from '@/components/shared';
+import { PageHeader, AsyncBoundary } from '@/components/shared';
 import {
   Card,
   CardBody,
@@ -38,6 +38,8 @@ import {
 import type { User } from '@/types';
 import { paths } from '@/routes/paths';
 import { formatDate } from '@/utils/date';
+import { employeeId } from '@/utils/validation';
+import { toApiError } from '@/services/http/apiClient';
 
 export function StaffListPage() {
   const { showToast } = useToast();
@@ -47,6 +49,8 @@ export function StaffListPage() {
 
   // Approval / rejection state
   const [approveUser, setApproveUser] = useState<User | null>(null);
+  const [assignedEmpId, setAssignedEmpId] = useState('');
+  const [approveError, setApproveError] = useState('');
   const [approving, setApproving] = useState(false);
 
   const [rejectUser, setRejectUser] = useState<User | null>(null);
@@ -64,20 +68,41 @@ export function StaffListPage() {
 
   const state = useAsync(loadData, [loadData]);
 
+  const openApprove = (staff: User) => {
+    setApproveUser(staff);
+    setAssignedEmpId(staff.employeeId || '');
+    setApproveError('');
+  };
+
   const handleApprove = async () => {
     if (!approveUser) return;
+    const cleanId = assignedEmpId.trim().toUpperCase();
+    if (!cleanId) {
+      setApproveError('Official Employee ID is required to approve this account.');
+      return;
+    }
+    const formatErr = employeeId(cleanId);
+    if (formatErr) {
+      setApproveError(formatErr);
+      return;
+    }
+
     setApproving(true);
+    setApproveError('');
     try {
-      await staffService.approve(approveUser.id);
+      await staffService.approve(approveUser.id, { employeeId: cleanId });
       showToast({
         tone: 'success',
         title: 'Staff member approved',
-        message: `${approveUser.fullName}'s account is now active.`,
+        message: `${approveUser.fullName}'s account is now active with Employee ID ${cleanId}.`,
       });
       setApproveUser(null);
+      setAssignedEmpId('');
       await state.reload({ silent: true });
-    } catch {
-      showToast({ tone: 'danger', title: 'Approval failed', message: 'Could not approve staff account.' });
+    } catch (err) {
+      const apiErr = toApiError(err);
+      setApproveError(apiErr.message);
+      showToast({ tone: 'danger', title: 'Approval failed', message: apiErr.message });
     } finally {
       setApproving(false);
     }
@@ -263,7 +288,14 @@ export function StaffListPage() {
                                 <Avatar name={staff.fullName} src={staff.avatarUrl} size="md" />
                                 <div>
                                   <h4 className="text-sm font-semibold text-zinc-900">{staff.fullName}</h4>
-                                  <p className="text-xs text-zinc-500">{staff.employeeId}</p>
+                                  <p className="text-xs text-zinc-500">
+                                    {staff.employeeId ? (
+                                      <span>ID: {staff.employeeId}</span>
+                                    ) : (
+                                      <span className="italic text-amber-700 font-medium">ID pending assignment</span>
+                                    )}{' '}
+                                    · <span className="font-mono">{staff.referenceId}</span>
+                                  </p>
                                 </div>
                               </div>
                               <AccountStatusBadge status={staff.status} />
@@ -304,7 +336,7 @@ export function StaffListPage() {
                                 <Button
                                   size="sm"
                                   variant="primary"
-                                  onClick={() => setApproveUser(staff)}
+                                  onClick={() => openApprove(staff)}
                                 >
                                   Approve
                                 </Button>
@@ -322,16 +354,93 @@ export function StaffListPage() {
         }}
       </AsyncBoundary>
 
-      {/* Confirmation Dialog for Approval */}
-      <ConfirmDialog
+      {/* Approval & Employee ID Assignment Dialog */}
+      <Dialog
         open={Boolean(approveUser)}
-        onCancel={() => setApproveUser(null)}
-        onConfirm={handleApprove}
+        onClose={() => {
+          setApproveUser(null);
+          setAssignedEmpId('');
+          setApproveError('');
+        }}
         title="Approve Staff Registration"
-        description={`Are you sure you want to approve ${approveUser?.fullName} (${approveUser?.employeeId})? This will activate their account and grant them access to daily KPI entry.`}
-        confirmLabel="Confirm Approval"
-        loading={approving}
-      />
+        description="Review applicant details and assign an official Employee ID to activate the account."
+        size="md"
+        busy={approving}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setApproveUser(null);
+                setAssignedEmpId('');
+                setApproveError('');
+              }}
+              disabled={approving}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleApprove} loading={approving}>
+              Approve & Activate Account
+            </Button>
+          </>
+        }
+      >
+        {approveUser && (
+          <div className="space-y-4 py-2">
+            {/* Candidate Review Summary */}
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar name={approveUser.fullName} src={approveUser.avatarUrl} size="md" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-900">{approveUser.fullName}</h4>
+                    <p className="text-xs text-zinc-500 font-mono">Ref: {approveUser.referenceId || 'N/A'}</p>
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                  <CheckCircle className="size-3 stroke-[2.5]" />
+                  Email Verified
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs text-zinc-600 border-t border-zinc-200/60 pt-2.5">
+                <div>
+                  <span className="text-zinc-400">Position:</span>{' '}
+                  <span className="font-semibold text-zinc-900">{approveUser.position}</span>
+                </div>
+                <div>
+                  <span className="text-zinc-400">Branch:</span>{' '}
+                  <span className="font-semibold text-zinc-900">{approveUser.branchName}</span>
+                </div>
+                <div className="truncate">
+                  <span className="text-zinc-400">Email:</span> {approveUser.email}
+                </div>
+                <div>
+                  <span className="text-zinc-400">Phone:</span> {approveUser.phone}
+                </div>
+              </div>
+            </div>
+
+            {/* Manager-controlled Employee ID field */}
+            <Field
+              label="Official Employee ID"
+              error={approveError}
+              required
+              hint="Enter the official bank employee identifier (e.g. BOA-S012). This will be used by the employee to log in."
+            >
+              <Input
+                value={assignedEmpId}
+                onChange={(e) => {
+                  setAssignedEmpId(e.target.value);
+                  setApproveError('');
+                }}
+                placeholder="e.g. BOA-S012"
+                autoFocus
+              />
+            </Field>
+          </div>
+        )}
+      </Dialog>
 
       {/* Rejection Modal Dialog */}
       <Dialog

@@ -1,0 +1,301 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  staff
+  manager
+}
+
+enum AccountStatus {
+  pending_email_verification
+  pending_approval
+  active
+  rejected
+  deactivated
+}
+
+enum RuleStatus {
+  approved
+  pending_validation
+}
+
+enum KpiFrequency {
+  daily
+  weekly
+  monthly
+  quarterly
+}
+
+enum KpiValueType {
+  integer
+  decimal
+  currency
+  percentage
+}
+
+enum PerformanceStatus {
+  on_target
+  needs_attention
+  below_target
+  not_submitted
+  unrated
+}
+
+enum AnnouncementCategory {
+  meeting
+  holiday
+  notice
+  general
+}
+
+enum AnnouncementStatus {
+  draft
+  published
+  archived
+}
+
+enum ConversationType {
+  branch
+  direct
+}
+
+enum VerificationPurpose {
+  email_verification
+  password_reset
+}
+
+model User {
+  id               String        @id @default(uuid())
+  employeeId       String?       @unique
+  referenceId      String?       @unique
+  fullName         String
+  email            String        @unique
+  phone            String
+  positionId       String?
+  position         Position?     @relation(fields: [positionId], references: [id], onDelete: SetNull)
+  positionTitle    String
+  branchName       String
+  role             Role          @default(staff)
+  status           AccountStatus @default(pending_email_verification)
+  password         String
+  emailVerified    Boolean       @default(false)
+  emailVerifiedAt  DateTime?
+  avatarUrl        String?
+  approvedAt       DateTime?
+  rejectionReason  String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  kpiAssignments           KpiAssignment[]
+  kpiEntries               KpiEntry[]
+  sentFeedback             Feedback[]                 @relation("SentFeedback")
+  receivedFeedback         Feedback[]                 @relation("ReceivedFeedback")
+  authoredAnnouncements    Announcement[]
+  announcementReads        AnnouncementRead[]
+  conversationParticipants ConversationParticipant[]
+  messages                 ChatMessage[]
+  auditLogs                AuditLog[]
+
+  @@index([email])
+  @@index([employeeId])
+  @@index([referenceId])
+  @@index([status])
+}
+
+model Position {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+
+  @@index([name])
+}
+
+model Kpi {
+  id              String       @id @default(uuid())
+  name            String
+  description     String
+  unit            String
+  valueType       KpiValueType
+  target          Float
+  frequency       KpiFrequency
+  weight          Float?
+  calculationRule String?
+  ruleStatus      RuleStatus   @default(pending_validation)
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  assignments KpiAssignment[]
+  entries     KpiEntry[]
+  feedbacks   Feedback[]
+
+  @@index([isActive])
+}
+
+model KpiAssignment {
+  id             String   @id @default(uuid())
+  kpiId          String
+  kpi            Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  staffId        String
+  staff          User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  targetOverride Float?
+  assignedAt     DateTime @default(now())
+
+  @@unique([kpiId, staffId])
+  @@index([staffId])
+}
+
+model KpiEntry {
+  id                 String            @id @default(uuid())
+  staffId            String
+  staff              User              @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  kpiId              String
+  kpi                Kpi               @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  date               String
+  actual             Float
+  target             Float
+  performancePercent Float?
+  status             PerformanceStatus @default(unrated)
+  note               String?
+  submittedAt        DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([staffId, kpiId, date])
+  @@index([staffId, date])
+}
+
+model Feedback {
+  id          String    @id @default(uuid())
+  staffId     String
+  staff       User      @relation("ReceivedFeedback", fields: [staffId], references: [id], onDelete: Cascade)
+  managerId   String
+  manager     User      @relation("SentFeedback", fields: [managerId], references: [id], onDelete: Cascade)
+  subject     String
+  message     String
+  period      String?
+  periodLabel String?
+  kpiId       String?
+  kpi         Kpi?      @relation(fields: [kpiId], references: [id], onDelete: SetNull)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([staffId])
+  @@index([managerId])
+}
+
+model Announcement {
+  id          String               @id @default(uuid())
+  title       String
+  body        String
+  category    AnnouncementCategory
+  status      AnnouncementStatus   @default(draft)
+  pinned      Boolean              @default(false)
+  authorId    String
+  author      User                 @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  publishedAt DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  reads AnnouncementRead[]
+
+  @@index([status])
+}
+
+model AnnouncementRead {
+  id             String       @id @default(uuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+}
+
+model Conversation {
+  id        String           @id @default(uuid())
+  type      ConversationType @default(direct)
+  title     String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  participants ConversationParticipant[]
+  messages     ChatMessage[]
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
+
+  @@unique([conversationId, userId])
+}
+
+model ChatMessage {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body           String
+  isEdited       Boolean      @default(false)
+  sentAt         DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([conversationId, sentAt])
+}
+
+model SystemSettings {
+  id                 String     @id @default("default")
+  branchName         String     @default("Finfine Main Branch")
+  branchCode         String     @default("BOA-001")
+  onTargetMin        Float      @default(85)
+  needsAttentionMin  Float      @default(70)
+  thresholdsStatus   RuleStatus @default(pending_validation)
+  allowEditSubmitted Boolean    @default(true)
+  backdateDays       Int        @default(3)
+  entryPolicyStatus  RuleStatus @default(pending_validation)
+  weightingEnabled   Boolean    @default(true)
+  updatedAt          DateTime   @updatedAt
+}
+
+model VerificationCode {
+  id         String              @id @default(uuid())
+  target     String
+  codeHash   String
+  purpose    VerificationPurpose
+  expiresAt  DateTime
+  resendAfter DateTime
+  consumed   Boolean             @default(false)
+  resetToken String?
+  createdAt  DateTime            @default(now())
+
+  @@index([target, purpose])
+  @@index([resetToken])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([action])
+  @@index([actorId])
+}

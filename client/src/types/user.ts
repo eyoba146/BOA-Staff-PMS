@@ -12,6 +12,8 @@ export type AccountStatus =
 export interface User {
   id: string;
   employeeId: string;
+  /** Registration reference tracking ID for pending candidates prior to manager Employee ID assignment. */
+  referenceId?: string;
   fullName: string;
   email: string;
   phone: string;
@@ -46,7 +48,6 @@ export interface LoginResponse {
 
 export interface RegisterRequest {
   fullName: string;
-  employeeId: string;
   position: string;
   email: string;
   phone: string;
@@ -57,16 +58,16 @@ export interface RegisterResponse {
   referenceId: string;
   status: AccountStatus;
   email: string;
-  employeeId: string;
+  employeeId?: string;
   expiresInSeconds?: number;
   resendCooldownSeconds?: number;
   demoCode?: string;
 }
 
 export interface VerifyEmailRequest {
-  employeeId: string;
-  email?: string;
+  email: string;
   code: string;
+  employeeId?: string;
 }
 
 export interface VerifyEmailResponse {
@@ -77,8 +78,8 @@ export interface VerifyEmailResponse {
 }
 
 export interface ResendEmailCodeRequest {
-  employeeId: string;
-  email?: string;
+  email: string;
+  employeeId?: string;
 }
 
 export interface ResendCodeResponse {
@@ -121,7 +122,7 @@ export interface ResetPasswordRequest {
 }
 
 export interface AccountStatusResult {
-  employeeId: string;
+  employeeId?: string;
   fullName: string;
   email?: string;
   status: AccountStatus;

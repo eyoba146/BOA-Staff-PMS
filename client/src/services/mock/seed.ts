@@ -6,6 +6,7 @@ import type {
   ISODate,
   Kpi,
   KpiAssignment,
+  Position,
   SystemSettings,
   User,
 } from '@/types';
@@ -61,6 +62,7 @@ export interface MockDb {
   version: number;
   seededOn: ISODate;
   users: MockUser[];
+  positions: Position[];
   kpis: StoredKpi[];
   assignments: KpiAssignment[];
   entries: StoredEntry[];
@@ -71,7 +73,7 @@ export interface MockDb {
   settings: SystemSettings;
 }
 
-export const MOCK_DB_VERSION = 1;
+export const MOCK_DB_VERSION = 2;
 export const DEMO_PASSWORD = 'Demo@1234';
 const BRANCH = 'Demo Branch';
 
@@ -107,12 +109,28 @@ export function createSeed(): MockDb {
     approvedAt: status === 'active' || status === 'deactivated' ? created : null,
     rejectionReason: null,
     password: DEMO_PASSWORD,
-    referenceId: `REG-${employeeId}`,
+    referenceId: extra.referenceId ?? (employeeId ? `REG-${employeeId}` : `REG-${id.replace('u_', '').toUpperCase()}-2026`),
     avatarUrl: extra.avatarUrl ?? null,
     emailVerified: status !== 'pending_email_verification',
     emailVerifiedAt: status !== 'pending_email_verification' ? created : null,
     ...extra,
   });
+
+  const pos = (id: string, name: string, isActive = true): Position => ({
+    id,
+    name,
+    isActive,
+    createdAt: created,
+    updatedAt: created,
+  });
+
+  const positions: Position[] = [
+    pos('pos_cso', 'Customer Service Officer (demo)', true),
+    pos('pos_ro', 'Relationship Officer (demo)', true),
+    pos('pos_cash', 'Cash Officer (demo)', true),
+    pos('pos_acct', 'Branch Accountant (demo)', true),
+    pos('pos_clerk', 'Junior Banking Clerk (demo)', false),
+  ];
 
   const users: MockUser[] = [
     person('u_mgr', 'BOA-M001', 'Mekdes Assefa', 'Branch Manager', 'manager', 'active'),
@@ -124,19 +142,22 @@ export function createSeed(): MockDb {
     person('u_s06', 'BOA-S006', 'Biniam Tadesse', 'Relationship Officer (demo)', 'staff', 'active'),
     person('u_s07', 'BOA-S007', 'Liya Mekonnen', 'Customer Service Officer (demo)', 'staff', 'active'),
     person('u_s08', 'BOA-S008', 'Abel Worku', 'Cash Officer (demo)', 'staff', 'deactivated'),
-    person('u_s09', 'BOA-S009', 'Ruth Kebede', 'Customer Service Officer (demo)', 'staff', 'pending_approval', {
+    person('u_s09', '', 'Ruth Kebede', 'Customer Service Officer (demo)', 'staff', 'pending_approval', {
       createdAt: iso(addDays(today, -1), 15, 20),
       approvedAt: null,
+      referenceId: 'REG-202610-S009',
     }),
-    person('u_s10', 'BOA-S010', 'Samuel Getachew', 'Cash Officer (demo)', 'staff', 'pending_approval', {
+    person('u_s10', '', 'Samuel Getachew', 'Cash Officer (demo)', 'staff', 'pending_approval', {
       createdAt: iso(today, 8, 5),
       approvedAt: null,
+      referenceId: 'REG-202610-S010',
     }),
-    person('u_s11', 'BOA-S011', 'Elias Desta', 'Customer Service Officer (demo)', 'staff', 'pending_email_verification', {
+    person('u_s11', '', 'Elias Desta', 'Customer Service Officer (demo)', 'staff', 'pending_email_verification', {
       createdAt: iso(today, 9, 30),
       approvedAt: null,
       emailVerified: false,
       emailVerifiedAt: null,
+      referenceId: 'REG-202610-S011',
     }),
   ];
 
@@ -301,6 +322,7 @@ export function createSeed(): MockDb {
     version: MOCK_DB_VERSION,
     seededOn: today,
     users,
+    positions,
     kpis,
     assignments,
     entries,

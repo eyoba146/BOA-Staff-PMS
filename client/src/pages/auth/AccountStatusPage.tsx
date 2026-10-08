@@ -76,16 +76,18 @@ function Timeline({ result }: { result: AccountStatusResult }) {
 export function AccountStatusPage() {
   useDocumentTitle('Registration status');
   const location = useLocation();
-  const state = location.state as { employeeId?: string; justRegistered?: string } | null;
+  const state = location.state as { employeeId?: string; referenceId?: string; email?: string; justRegistered?: string } | null;
 
-  const [employeeId, setEmployeeId] = useState(state?.employeeId ?? '');
+  const [identifier, setIdentifier] = useState(
+    state?.referenceId || state?.employeeId || state?.email || '',
+  );
   const [result, setResult] = useState<AccountStatusResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const lookup = async (id: string) => {
     if (!id.trim()) {
-      setError('Enter your employee ID.');
+      setError('Enter your registration reference ID, email, or employee ID.');
       return;
     }
     setLoading(true);
@@ -101,13 +103,14 @@ export function AccountStatusPage() {
   };
 
   useEffect(() => {
-    if (state?.employeeId) void lookup(state.employeeId);
+    const initialId = state?.referenceId || state?.employeeId || state?.email;
+    if (initialId) void lookup(initialId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    void lookup(employeeId);
+    void lookup(identifier);
   };
 
   return (
@@ -127,8 +130,13 @@ export function AccountStatusPage() {
       )}
 
       <form onSubmit={onSubmit} noValidate className="flex items-end gap-2 rounded-lg border border-zinc-200 bg-white p-4 shadow-card">
-        <Field label="Employee ID" error={error ?? undefined} className="flex-1">
-          <Input leftIcon={<IdCard />} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="e.g. BOA-S009" />
+        <Field label="Reference ID, Email, or Employee ID" error={error ?? undefined} className="flex-1">
+          <Input
+            leftIcon={<IdCard />}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="e.g. REG-123456, staff@example.com, or BOA-S009"
+          />
         </Field>
         <Button type="submit" loading={loading} leftIcon={<Search className="size-4" />} className={error ? 'mb-[26px]' : undefined}>
           Check
@@ -141,7 +149,12 @@ export function AccountStatusPage() {
             <div>
               <p className="font-semibold text-zinc-900">{result.fullName}</p>
               <p className="text-[13px] text-zinc-500">
-                {result.employeeId} · Ref. <span className="font-mono">{result.referenceId}</span>
+                {result.employeeId && result.employeeId !== 'Pending Assignment' ? (
+                  <span>ID: {result.employeeId}</span>
+                ) : (
+                  <span className="italic text-zinc-400">ID: Pending Manager Assignment</span>
+                )}{' '}
+                · Ref. <span className="font-mono">{result.referenceId}</span>
               </p>
             </div>
             <AccountStatusBadge status={result.status} />
@@ -155,7 +168,7 @@ export function AccountStatusPage() {
                 </Alert>
                 <Link
                   to={paths.register}
-                  state={{ step: 'verify', employeeId: result.employeeId, email: result.email }}
+                  state={{ step: 'verify', email: result.email, referenceId: result.referenceId }}
                   className="block"
                 >
                   <Button fullWidth>Complete Email Verification</Button>

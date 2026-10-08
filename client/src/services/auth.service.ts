@@ -148,23 +148,32 @@ const mockAuthService: AuthService = {
     await delay(600);
     const db = getDb();
     const fieldErrors: Record<string, string> = {};
-    if (db.users.some((u) => u.employeeId.toLowerCase() === req.employeeId.trim().toLowerCase())) {
-      fieldErrors.employeeId = 'An account with this employee ID already exists.';
-    }
-    if (db.users.some((u) => u.email.toLowerCase() === req.email.trim().toLowerCase())) {
+    const cleanEmail = req.email.trim().toLowerCase();
+
+    if (db.users.some((u) => u.email.toLowerCase() === cleanEmail)) {
       fieldErrors.email = 'This email address is already registered.';
     }
+
+    // Verify position exists and is active
+    if (db.positions && db.positions.length > 0) {
+      const pos = db.positions.find((p) => p.name.toLowerCase() === req.position.trim().toLowerCase());
+      if (!pos) {
+        fieldErrors.position = 'Please select a valid position from the approved list.';
+      } else if (!pos.isActive) {
+        fieldErrors.position = 'This position is currently inactive and not accepting registrations.';
+      }
+    }
+
     if (Object.keys(fieldErrors).length) {
       throw mockError(409, 'CONFLICT', 'Please correct the highlighted fields.', fieldErrors);
     }
 
-    const empId = req.employeeId.trim().toUpperCase();
-    const referenceId = `REG-${empId}`;
-    const cleanEmail = req.email.trim().toLowerCase();
+    // Generate unique reference ID (e.g. REG-748291)
+    const referenceId = `REG-${Math.floor(100000 + Math.random() * 900000)}`;
 
     db.users.push({
       id: uid('u'),
-      employeeId: empId,
+      employeeId: '', // To be assigned/confirmed by branch manager upon approval
       fullName: req.fullName.trim(),
       email: cleanEmail,
       phone: req.phone.trim(),
@@ -184,7 +193,7 @@ const mockAuthService: AuthService = {
 
     // Setup verification code (5 min expiration, 60s cooldown)
     const demoCode = '123456';
-    emailVerificationStore.set(empId, {
+    emailVerificationStore.set(cleanEmail, {
       code: demoCode,
       expiresAt: Date.now() + 300 * 1000,
       resendAfter: Date.now() + 60 * 1000,
@@ -194,22 +203,29 @@ const mockAuthService: AuthService = {
       referenceId,
       status: 'pending_email_verification',
       email: cleanEmail,
-      employeeId: empId,
+      employeeId: '',
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
       demoCode,
     };
   },
 
-  async verifyEmail({ employeeId, code }) {
+  async verifyEmail({ email, code, employeeId }) {
     await delay(500);
-    const empId = employeeId.trim().toUpperCase();
-    const user = getDb().users.find((u) => u.employeeId.toUpperCase() === empId);
+    const targetEmail = email?.trim().toLowerCase();
+    const empId = employeeId?.trim().toUpperCase();
+
+    const user = getDb().users.find((u) =>
+      (targetEmail && u.email.toLowerCase() === targetEmail) ||
+      (empId && u.employeeId && u.employeeId.toUpperCase() === empId)
+    );
     if (!user) {
-      throw mockError(404, 'NOT_FOUND', 'User record not found for this employee ID.');
+      throw mockError(404, 'NOT_FOUND', 'Registration record not found for this account.');
     }
 
-    const record = emailVerificationStore.get(empId);
+    const storeKey = targetEmail || user.email.toLowerCase() || empId || '';
+    const record = emailVerificationStore.get(storeKey) || (empId ? emailVerificationStore.get(empId) : undefined);
+
     if (record && Date.now() > record.expiresAt) {
       throw mockError(400, 'CODE_EXPIRED', 'The verification code has expired. Please request a new code.');
     }
@@ -224,7 +240,8 @@ const mockAuthService: AuthService = {
     user.emailVerified = true;
     user.emailVerifiedAt = nowISO();
     commit();
-    emailVerificationStore.delete(empId);
+    emailVerificationStore.delete(storeKey);
+    if (empId) emailVerificationStore.delete(empId);
 
     return {
       success: true,
@@ -234,16 +251,28 @@ const mockAuthService: AuthService = {
     };
   },
 
-  async resendEmailCode({ employeeId }) {
+  async resendEmailCode({ email, employeeId }) {
     await delay(450);
-    const empId = employeeId.trim().toUpperCase();
-    const record = emailVerificationStore.get(empId);
+    const targetEmail = email?.trim().toLowerCase();
+    const empId = employeeId?.trim().toUpperCase();
+
+    const user = getDb().users.find((u) =>
+      (targetEmail && u.email.toLowerCase() === targetEmail) ||
+      (empId && u.employeeId && u.employeeId.toUpperCase() === empId)
+    );
+    if (!user) {
+      throw mockError(404, 'NOT_FOUND', 'Registration record not found for this account.');
+    }
+
+    const storeKey = targetEmail || user.email.toLowerCase() || empId || '';
+    const record = emailVerificationStore.get(storeKey) || (empId ? emailVerificationStore.get(empId) : undefined);
+
     if (record && Date.now() < record.resendAfter) {
       throw mockError(429, 'RATE_LIMIT', 'Please wait until the 60-second cooldown expires before requesting a new code.');
     }
 
     const demoCode = '123456';
-    emailVerificationStore.set(empId, {
+    emailVerificationStore.set(storeKey, {
       code: demoCode,
       expiresAt: Date.now() + 300 * 1000,
       resendAfter: Date.now() + 60 * 1000,
@@ -346,12 +375,19 @@ const mockAuthService: AuthService = {
     passwordResetStore.delete(id);
   },
 
-  async getAccountStatus(employeeId) {
+  async getAccountStatus(identifier) {
     await delay(400);
-    const user = getDb().users.find((u) => u.employeeId.toLowerCase() === employeeId.trim().toLowerCase() && u.role === 'staff');
-    if (!user) throw mockError(404, 'NOT_FOUND', 'No registration was found for this employee ID.');
+    const id = identifier.trim().toLowerCase();
+    const user = getDb().users.find(
+      (u) =>
+        u.role === 'staff' &&
+        ((u.employeeId && u.employeeId.toLowerCase() === id) ||
+          (u.email && u.email.toLowerCase() === id) ||
+          (u.referenceId && u.referenceId.toLowerCase() === id)),
+    );
+    if (!user) throw mockError(404, 'NOT_FOUND', 'No registration record was found matching this identifier.');
     return {
-      employeeId: user.employeeId,
+      employeeId: user.employeeId || 'Pending Assignment',
       fullName: user.fullName,
       email: user.email,
       status: user.status,

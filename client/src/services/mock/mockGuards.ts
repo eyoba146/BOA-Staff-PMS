@@ -23,7 +23,7 @@ export function requireManager(): MockUser {
 /** Strip mock-only fields; mirrors a backend DTO. */
 export function toPublicUser(u: MockUser): User {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { password, referenceId, ...rest } = u;
+  const { password, ...rest } = u;
   const db = getDb();
   return {
     ...rest,

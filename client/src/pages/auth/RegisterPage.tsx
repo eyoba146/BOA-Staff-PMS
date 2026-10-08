@@ -2,6 +2,7 @@ import { Check, CheckCircle2, Circle, Clock, Eye, EyeOff, Lock, ShieldCheck } fr
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthStepIndicator } from '@/components/auth/AuthStepIndicator';
+import { PositionSelect } from '@/components/auth/PositionSelect';
 import { VerificationCodeForm } from '@/components/auth/VerificationCodeForm';
 import { Alert, Button, Checkbox, Field, Input } from '@/components/ui';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
@@ -12,7 +13,6 @@ import { paths } from '@/routes/paths';
 import { cn } from '@/utils/cn';
 import {
   email,
-  employeeId,
   hasErrors,
   minLength,
   PASSWORD_RULES,
@@ -33,7 +33,6 @@ const REG_STEPS = [
 
 type Values = {
   fullName: string;
-  employeeId: string;
   position: string;
   email: string;
   phone: string;
@@ -44,7 +43,6 @@ type Errors = Partial<Record<keyof Values | 'declaration', string>>;
 
 const initialValues: Values = {
   fullName: '',
-  employeeId: '',
   position: '',
   email: '',
   phone: '',
@@ -68,7 +66,7 @@ function Section({ title, step, children }: { title: string; step: number; child
 
 /**
  * AUTH-02 — Multi-step staff registration experience.
- * Step 1: Staff registration details & credential setup
+ * Step 1: Staff registration details & credential setup (Employee ID assigned later by management)
  * Step 2: Email verification with 6-digit code, 5m expiry, 60s cooldown
  * Step 3: Confirmation: Email verified & pending branch manager review
  */
@@ -80,7 +78,6 @@ export function RegisterPage() {
 
   const navState = location.state as {
     step?: RegisterStep;
-    employeeId?: string;
     email?: string;
     referenceId?: string;
     demoCode?: string;
@@ -97,9 +94,6 @@ export function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Verification metadata
-  const [registeredEmpId, setRegisteredEmpId] = useState(
-    navState?.employeeId || searchParams.get('employeeId') || '',
-  );
   const [registeredEmail, setRegisteredEmail] = useState(
     navState?.email || searchParams.get('email') || '',
   );
@@ -110,7 +104,6 @@ export function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
-    if (navState?.employeeId) setRegisteredEmpId(navState.employeeId);
     if (navState?.email) setRegisteredEmail(navState.email);
     if (navState?.referenceId) setReferenceId(navState.referenceId);
     if (navState?.demoCode) setDemoCode(navState.demoCode);
@@ -126,7 +119,6 @@ export function RegisterPage() {
     e.preventDefault();
     const errs: Errors = validateForm(values, {
       fullName: [required('Full name'), minLength(3, 'Full name')],
-      employeeId: [required('Employee ID'), employeeId],
       position: [required('Position')],
       email: [required('Email'), email],
       phone: [required('Phone number'), phone],
@@ -143,7 +135,6 @@ export function RegisterPage() {
       const { password, ...rest } = values;
       const res = await authService.register({ ...rest, password });
       setReferenceId(res.referenceId);
-      setRegisteredEmpId(res.employeeId);
       setRegisteredEmail(res.email);
       if (res.demoCode) setDemoCode(res.demoCode);
       setStep('verify');
@@ -159,7 +150,6 @@ export function RegisterPage() {
   // Step 2: Verify Code
   const handleVerifyEmail = async (code: string) => {
     const res = await authService.verifyEmail({
-      employeeId: registeredEmpId,
       email: registeredEmail,
       code,
     });
@@ -170,7 +160,6 @@ export function RegisterPage() {
   // Step 2: Resend Code
   const handleResendCode = async () => {
     const res = await authService.resendEmailCode({
-      employeeId: registeredEmpId,
       email: registeredEmail,
     });
     if (res.demoCode) setDemoCode(res.demoCode);
@@ -273,24 +262,30 @@ export function RegisterPage() {
               </Section>
 
               <Section step={2} title="Employment details">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Employee ID" error={errors.employeeId} required hint="Official ID (e.g. BOA-S011)">
-                    <Input
-                      value={values.employeeId}
-                      onChange={set('employeeId')}
-                      autoComplete="off"
-                      placeholder="BOA-SXXX"
-                      className="h-11 rounded-xl"
-                    />
-                  </Field>
-                  <Field label="Position" error={errors.position} required hint="Your branch title">
-                    <Input
-                      value={values.position}
-                      onChange={set('position')}
-                      placeholder="e.g. Customer Service Officer"
-                      className="h-11 rounded-xl"
-                    />
-                  </Field>
+                <Field
+                  label="Branch Position"
+                  error={errors.position}
+                  required
+                  hint="Select your official branch role from the approved positions list"
+                >
+                  <PositionSelect
+                    value={values.position}
+                    onChange={(pos) => {
+                      setValues((v) => ({ ...v, position: pos }));
+                      if (errors.position) setErrors((e) => ({ ...e, position: undefined }));
+                    }}
+                    error={errors.position}
+                  />
+                </Field>
+
+                <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3.5 text-xs text-zinc-600 space-y-1">
+                  <div className="flex items-center gap-2 font-medium text-zinc-900">
+                    <ShieldCheck className="size-4 text-gold-600" />
+                    <span>Official Employee ID Assignment</span>
+                  </div>
+                  <p className="text-zinc-500 leading-relaxed pl-6">
+                    Official Employee IDs are assigned and confirmed directly by branch management during application review. You do not enter an Employee ID during self-registration.
+                  </p>
                 </div>
               </Section>
 
@@ -425,11 +420,11 @@ export function RegisterPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Registration Reference</span>
                 <span className="font-mono text-sm font-bold text-zinc-900 bg-white px-2.5 py-1 rounded-md border border-zinc-200">
-                  {referenceId || `REG-${registeredEmpId}`}
+                  {referenceId || 'REG-PENDING'}
                 </span>
               </div>
               <p className="text-xs text-zinc-600 leading-relaxed text-left">
-                Keep this reference ID for tracking. You will be able to access the platform once your branch manager approves your registration.
+                Keep this reference ID for tracking. Your Branch Manager will assign your official Employee ID upon reviewing and approving your account.
               </p>
             </div>
 
@@ -443,7 +438,7 @@ export function RegisterPage() {
                   </span>
                   <div>
                     <p className="text-xs font-semibold text-zinc-900">Registration details submitted</p>
-                    <p className="text-[11px] text-zinc-500">Employee ID: {registeredEmpId}</p>
+                    <p className="text-[11px] text-zinc-500">Position: {values.position || 'Approved Position'}</p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
@@ -460,8 +455,8 @@ export function RegisterPage() {
                     <Clock className="size-3.5" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-zinc-900">Manager review & approval</p>
-                    <p className="text-[11px] text-orange-700 font-medium">Currently in queue for Branch Manager approval</p>
+                    <p className="text-xs font-semibold text-zinc-900">Manager review & Employee ID assignment</p>
+                    <p className="text-[11px] text-orange-700 font-medium">In queue for Branch Manager review and Employee ID allocation</p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3">
@@ -470,7 +465,7 @@ export function RegisterPage() {
                   </span>
                   <div>
                     <p className="text-xs font-medium text-zinc-400">Account activated & platform access</p>
-                    <p className="text-[11px] text-zinc-400">Available after manager approval</p>
+                    <p className="text-[11px] text-zinc-400">Sign in with your assigned Employee ID once approved</p>
                   </div>
                 </li>
               </ol>
@@ -485,7 +480,8 @@ export function RegisterPage() {
                 onClick={() =>
                   navigate(paths.accountStatus, {
                     state: {
-                      employeeId: registeredEmpId,
+                      referenceId,
+                      email: registeredEmail,
                       justRegistered: referenceId,
                     },
                   })

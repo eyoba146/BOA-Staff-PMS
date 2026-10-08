@@ -14,8 +14,8 @@ export interface StaffService {
   list(params?: StaffListParams): Promise<User[]>;
   getById(id: string): Promise<User>;
   listPending(): Promise<User[]>;
-  /** Approve a pending registration, optionally assigning KPIs in the same step (SRS §14.4). */
-  approve(id: string, opts?: { kpiIds?: string[] }): Promise<User>;
+  /** Approve a pending registration, assigning the official Employee ID and optionally KPIs (SRS §14.4). */
+  approve(id: string, opts?: { employeeId?: string; kpiIds?: string[] }): Promise<User>;
   reject(id: string, reason: string): Promise<User>;
   setStatus(id: string, status: 'active' | 'deactivated'): Promise<User>;
   updateMyProfile(req: UpdateProfileRequest): Promise<User>;
@@ -79,6 +79,34 @@ const mockStaffService: StaffService = {
     if (user.status !== 'pending_approval') {
       throw mockError(409, 'INVALID_STATE', 'Only verified pending registrations can be approved.');
     }
+    if (!user.emailVerified) {
+      throw mockError(400, 'EMAIL_NOT_VERIFIED', 'Candidate must complete email verification before manager approval.');
+    }
+
+    const assignedEmpId = opts?.employeeId?.trim() || user.employeeId?.trim();
+    if (!assignedEmpId) {
+      throw mockError(400, 'EMPLOYEE_ID_REQUIRED', 'Official Employee ID must be assigned by management prior to approval.');
+    }
+
+    // Check Employee ID uniqueness among other registered users
+    const duplicate = db.users.find(
+      (u) => u.id !== id && u.employeeId && u.employeeId.toLowerCase() === assignedEmpId.toLowerCase()
+    );
+    if (duplicate) {
+      throw mockError(409, 'DUPLICATE_EMPLOYEE_ID', `Employee ID "${assignedEmpId}" is already assigned to ${duplicate.fullName}.`);
+    }
+
+    // Check that the selected position is an approved branch position
+    if (db.positions && db.positions.length > 0) {
+      const positionExists = db.positions.some(
+        (p) => p.name.toLowerCase() === user.position.toLowerCase()
+      );
+      if (!positionExists) {
+        throw mockError(400, 'INVALID_POSITION', `The position "${user.position}" is not an approved branch position.`);
+      }
+    }
+
+    user.employeeId = assignedEmpId;
     user.status = 'active';
     user.approvedAt = nowISO();
     for (const kpiId of opts?.kpiIds ?? []) {

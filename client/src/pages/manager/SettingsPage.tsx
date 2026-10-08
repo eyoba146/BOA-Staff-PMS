@@ -25,6 +25,7 @@ import {
   Checkbox,
 } from '@/components/ui';
 import { required, strongPassword, validateForm, hasErrors } from '@/utils/validation';
+import { PositionManagementSection } from '@/components/manager';
 import type { SystemSettings } from '@/types';
 
 export function SettingsPage() {
@@ -326,6 +327,9 @@ export function SettingsPage() {
                   </form>
                 </CardBody>
               </Card>
+
+              {/* Branch Staff Positions Management */}
+              <PositionManagementSection />
 
               {/* Performance Status Thresholds */}
               <Card>
