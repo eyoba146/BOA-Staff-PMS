@@ -109,6 +109,8 @@ export function createSeed(): MockDb {
     password: DEMO_PASSWORD,
     referenceId: `REG-${employeeId}`,
     avatarUrl: extra.avatarUrl ?? null,
+    emailVerified: status !== 'pending_email_verification',
+    emailVerifiedAt: status !== 'pending_email_verification' ? created : null,
     ...extra,
   });
 
@@ -129,6 +131,12 @@ export function createSeed(): MockDb {
     person('u_s10', 'BOA-S010', 'Samuel Getachew', 'Cash Officer (demo)', 'staff', 'pending_approval', {
       createdAt: iso(today, 8, 5),
       approvedAt: null,
+    }),
+    person('u_s11', 'BOA-S011', 'Elias Desta', 'Customer Service Officer (demo)', 'staff', 'pending_email_verification', {
+      createdAt: iso(today, 9, 30),
+      approvedAt: null,
+      emailVerified: false,
+      emailVerifiedAt: null,
     }),
   ];
 

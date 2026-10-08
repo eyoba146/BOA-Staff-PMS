@@ -15,6 +15,7 @@ export const PERFORMANCE_STATUS_META: Record<PerformanceStatus, { label: string;
 };
 
 export const ACCOUNT_STATUS_META: Record<AccountStatus, { label: string; tone: Tone }> = {
+  pending_email_verification: { label: 'Pending email verification', tone: 'attention' },
   pending_approval: { label: 'Pending approval', tone: 'attention' },
   active: { label: 'Active', tone: 'success' },
   rejected: { label: 'Rejected', tone: 'danger' },

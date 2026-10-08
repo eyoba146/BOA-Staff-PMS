@@ -48,7 +48,7 @@ const mockStaffService: StaffService = {
     requireManager();
     const q = params.search?.trim().toLowerCase();
     return getDb()
-      .users.filter((u) => u.role === 'staff')
+      .users.filter((u) => u.role === 'staff' && u.status !== 'pending_email_verification')
       .filter((u) => !params.status || params.status === 'all' || u.status === params.status)
       .filter((u) => !q || [u.fullName, u.employeeId, u.position, u.email].some((f) => f.toLowerCase().includes(q)))
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
@@ -57,7 +57,11 @@ const mockStaffService: StaffService = {
   async getById(id) {
     await delay();
     requireManager();
-    return toPublicUser(findStaff(id));
+    const user = findStaff(id);
+    if (user.status === 'pending_email_verification') {
+      throw mockError(404, 'NOT_FOUND', 'Staff member not found or email verification pending.');
+    }
+    return toPublicUser(user);
   },
   async listPending() {
     await delay();
@@ -72,7 +76,9 @@ const mockStaffService: StaffService = {
     requireManager();
     const db = getDb();
     const user = findStaff(id);
-    if (user.status !== 'pending_approval') throw mockError(409, 'INVALID_STATE', 'Only pending registrations can be approved.');
+    if (user.status !== 'pending_approval') {
+      throw mockError(409, 'INVALID_STATE', 'Only verified pending registrations can be approved.');
+    }
     user.status = 'active';
     user.approvedAt = nowISO();
     for (const kpiId of opts?.kpiIds ?? []) {
@@ -88,7 +94,9 @@ const mockStaffService: StaffService = {
     await delay(500);
     requireManager();
     const user = findStaff(id);
-    if (user.status !== 'pending_approval') throw mockError(409, 'INVALID_STATE', 'Only pending registrations can be rejected.');
+    if (user.status !== 'pending_approval') {
+      throw mockError(409, 'INVALID_STATE', 'Only verified pending registrations can be rejected.');
+    }
     user.status = 'rejected';
     user.rejectionReason = reason;
     user.approvedAt = nowISO();
@@ -99,7 +107,7 @@ const mockStaffService: StaffService = {
     await delay(400);
     requireManager();
     const user = findStaff(id);
-    if (user.status === 'pending_approval' || user.status === 'rejected') {
+    if (user.status === 'pending_approval' || user.status === 'rejected' || user.status === 'pending_email_verification') {
       throw mockError(409, 'INVALID_STATE', 'Use approve/reject for registrations.');
     }
     user.status = status;

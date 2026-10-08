@@ -172,10 +172,22 @@ export function LoginPage() {
           {sessionNotice && !formError && <Alert tone="warning">{sessionNotice}</Alert>}
           {formError && (
             <Alert
-              tone="danger"
+              tone={formError.code === 'EMAIL_NOT_VERIFIED' ? 'warning' : 'danger'}
               action={
-                showStatusLink ? (
-                  <Link to={paths.accountStatus} className="text-[13px] font-medium underline underline-offset-2">
+                formError.code === 'EMAIL_NOT_VERIFIED' ? (
+                  <Link
+                    to={paths.register}
+                    state={{ step: 'verify', employeeId: values.identifier }}
+                    className="text-[13px] font-semibold underline underline-offset-2 hover:text-zinc-950"
+                  >
+                    Verify email now
+                  </Link>
+                ) : showStatusLink ? (
+                  <Link
+                    to={paths.accountStatus}
+                    state={{ employeeId: values.identifier }}
+                    className="text-[13px] font-medium underline underline-offset-2"
+                  >
                     View status
                   </Link>
                 ) : undefined

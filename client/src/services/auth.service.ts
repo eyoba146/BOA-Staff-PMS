@@ -1,12 +1,22 @@
 import { env } from '@/config/env';
 import type {
+  AccountStatus,
   AccountStatusResult,
   ChangePasswordRequest,
   LoginRequest,
   LoginResponse,
+  PasswordResetRequestResponse,
   RegisterRequest,
   RegisterResponse,
+  ResendCodeResponse,
+  ResendEmailCodeRequest,
+  ResendResetCodeRequest,
+  ResetPasswordRequest,
   User,
+  VerifyEmailRequest,
+  VerifyEmailResponse,
+  VerifyResetCodeRequest,
+  VerifyResetCodeResponse,
 } from '@/types';
 import { api, tokenStore } from './http/apiClient';
 import { commit, getDb, mockSession } from './mock/mockDb';
@@ -18,10 +28,19 @@ export interface AuthService {
   logout(): Promise<void>;
   /** Restore the session on app load. Resolves `null` when not signed in. */
   getCurrentUser(): Promise<User | null>;
-  register(req: RegisterRequest): Promise<RegisterResponse>;
   getAccountStatus(employeeId: string): Promise<AccountStatusResult>;
-  requestPasswordReset(identifier: string): Promise<void>;
   changePassword(req: ChangePasswordRequest): Promise<void>;
+
+  // Feature 2: Registration & Email verification
+  register(req: RegisterRequest): Promise<RegisterResponse>;
+  verifyEmail(req: VerifyEmailRequest): Promise<VerifyEmailResponse>;
+  resendEmailCode(req: ResendEmailCodeRequest): Promise<ResendCodeResponse>;
+
+  // Feature 1: Multi-step password reset
+  requestPasswordReset(identifier: string): Promise<PasswordResetRequestResponse>;
+  verifyResetCode(req: VerifyResetCodeRequest): Promise<VerifyResetCodeResponse>;
+  resendResetCode(req: ResendResetCodeRequest): Promise<ResendCodeResponse>;
+  resetPassword(req: ResetPasswordRequest): Promise<void>;
 }
 
 // ---------------- HTTP adapter (Express) ----------------
@@ -50,18 +69,45 @@ const httpAuthService: AuthService = {
       return null;
     }
   },
-  register: (req) => api.post<RegisterResponse>('/auth/register', req),
   getAccountStatus: (employeeId) => api.get<AccountStatusResult>('/auth/registration-status', { employeeId }),
-  requestPasswordReset: (identifier) => api.post<void>('/auth/forgot-password', { identifier }),
   changePassword: (req) => api.post<void>('/auth/change-password', req),
+
+  register: (req) => api.post<RegisterResponse>('/auth/register', req),
+  verifyEmail: (req) => api.post<VerifyEmailResponse>('/auth/verify-email', req),
+  resendEmailCode: (req) => api.post<ResendCodeResponse>('/auth/resend-email-code', req),
+
+  requestPasswordReset: (identifier) => api.post<PasswordResetRequestResponse>('/auth/forgot-password', { identifier }),
+  verifyResetCode: (req) => api.post<VerifyResetCodeResponse>('/auth/verify-reset-code', req),
+  resendResetCode: (req) => api.post<ResendCodeResponse>('/auth/resend-reset-code', req),
+  resetPassword: (req) => api.post<void>('/auth/reset-password', req),
 };
 
 // ---------------- Mock adapter ----------------
-const ACCOUNT_ERRORS = {
+const ACCOUNT_ERRORS: Record<AccountStatus, [string, string]> = {
+  pending_email_verification: ['EMAIL_NOT_VERIFIED', 'Your email address has not been verified yet. Please complete verification before signing in.'],
   pending_approval: ['ACCOUNT_PENDING', 'Your account is awaiting manager approval.'],
   rejected: ['ACCOUNT_REJECTED', 'Your registration was not approved. Check your account status for details.'],
   deactivated: ['ACCOUNT_DEACTIVATED', 'Your account has been deactivated. Please contact the branch manager.'],
-} as const;
+  active: ['ACCOUNT_ACTIVE', 'Account is active.'],
+};
+
+function maskEmail(email: string): string {
+  const parts = email.split('@');
+  if (parts.length !== 2) return '***@abyssinia.et';
+  const [name, domain] = parts;
+  if (name.length <= 2) return `${name[0]}***@${domain}`;
+  return `${name[0]}***${name[name.length - 1]}@${domain}`;
+}
+
+interface VerificationRecord {
+  code: string;
+  expiresAt: number;
+  resendAfter: number;
+  resetToken?: string;
+}
+
+const emailVerificationStore = new Map<string, VerificationRecord>();
+const passwordResetStore = new Map<string, VerificationRecord>();
 
 const mockAuthService: AuthService = {
   async login({ identifier, password, remember }) {
@@ -72,16 +118,22 @@ const mockAuthService: AuthService = {
       throw mockError(401, 'INVALID_CREDENTIALS', 'The employee ID or password is incorrect.');
     }
     if (user.status !== 'active') {
-      const [code, message] = ACCOUNT_ERRORS[user.status];
-      throw mockError(403, code, message);
+      const [code, message] = ACCOUNT_ERRORS[user.status] || ['ACCOUNT_INACTIVE', 'Account cannot sign in.'];
+      throw mockError(403, code, message, {
+        employeeId: user.employeeId,
+        email: user.email,
+        status: user.status,
+      });
     }
     mockSession.set(user.id, remember);
     return toPublicUser(user);
   },
+
   async logout() {
     await delay(150);
     mockSession.clear();
   },
+
   async getCurrentUser() {
     await delay(120);
     try {
@@ -91,6 +143,7 @@ const mockAuthService: AuthService = {
       return null;
     }
   },
+
   async register(req) {
     await delay(600);
     const db = getDb();
@@ -101,27 +154,198 @@ const mockAuthService: AuthService = {
     if (db.users.some((u) => u.email.toLowerCase() === req.email.trim().toLowerCase())) {
       fieldErrors.email = 'This email address is already registered.';
     }
-    if (Object.keys(fieldErrors).length) throw mockError(409, 'CONFLICT', 'Please correct the highlighted fields.', fieldErrors);
-    const referenceId = `REG-${req.employeeId.trim().toUpperCase()}`;
+    if (Object.keys(fieldErrors).length) {
+      throw mockError(409, 'CONFLICT', 'Please correct the highlighted fields.', fieldErrors);
+    }
+
+    const empId = req.employeeId.trim().toUpperCase();
+    const referenceId = `REG-${empId}`;
+    const cleanEmail = req.email.trim().toLowerCase();
+
     db.users.push({
       id: uid('u'),
-      employeeId: req.employeeId.trim().toUpperCase(),
+      employeeId: empId,
       fullName: req.fullName.trim(),
-      email: req.email.trim(),
+      email: cleanEmail,
       phone: req.phone.trim(),
       position: req.position.trim(),
       branchName: db.settings.branchName,
       role: 'staff',
-      status: 'pending_approval',
+      status: 'pending_email_verification',
       createdAt: nowISO(),
       approvedAt: null,
       rejectionReason: null,
       password: req.password,
       referenceId,
+      emailVerified: false,
+      emailVerifiedAt: null,
     });
     commit();
-    return { referenceId, status: 'pending_approval' };
+
+    // Setup verification code (5 min expiration, 60s cooldown)
+    const demoCode = '123456';
+    emailVerificationStore.set(empId, {
+      code: demoCode,
+      expiresAt: Date.now() + 300 * 1000,
+      resendAfter: Date.now() + 60 * 1000,
+    });
+
+    return {
+      referenceId,
+      status: 'pending_email_verification',
+      email: cleanEmail,
+      employeeId: empId,
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 60,
+      demoCode,
+    };
   },
+
+  async verifyEmail({ employeeId, code }) {
+    await delay(500);
+    const empId = employeeId.trim().toUpperCase();
+    const user = getDb().users.find((u) => u.employeeId.toUpperCase() === empId);
+    if (!user) {
+      throw mockError(404, 'NOT_FOUND', 'User record not found for this employee ID.');
+    }
+
+    const record = emailVerificationStore.get(empId);
+    if (record && Date.now() > record.expiresAt) {
+      throw mockError(400, 'CODE_EXPIRED', 'The verification code has expired. Please request a new code.');
+    }
+
+    const validCode = record ? record.code : '123456';
+    if (code.trim() !== validCode && code.trim() !== '123456') {
+      throw mockError(400, 'INVALID_CODE', 'Invalid verification code. Please check and try again.');
+    }
+
+    // Email verification successful -> advance to pending_approval
+    user.status = 'pending_approval';
+    user.emailVerified = true;
+    user.emailVerifiedAt = nowISO();
+    commit();
+    emailVerificationStore.delete(empId);
+
+    return {
+      success: true,
+      referenceId: user.referenceId,
+      status: 'pending_approval',
+      message: 'Your email has been successfully verified. Your account is now awaiting manager approval.',
+    };
+  },
+
+  async resendEmailCode({ employeeId }) {
+    await delay(450);
+    const empId = employeeId.trim().toUpperCase();
+    const record = emailVerificationStore.get(empId);
+    if (record && Date.now() < record.resendAfter) {
+      throw mockError(429, 'RATE_LIMIT', 'Please wait until the 60-second cooldown expires before requesting a new code.');
+    }
+
+    const demoCode = '123456';
+    emailVerificationStore.set(empId, {
+      code: demoCode,
+      expiresAt: Date.now() + 300 * 1000,
+      resendAfter: Date.now() + 60 * 1000,
+    });
+
+    return {
+      success: true,
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 60,
+      demoCode,
+      message: 'A new 6-digit verification code has been dispatched to your email address.',
+    };
+  },
+
+  async requestPasswordReset(identifier) {
+    await delay(500);
+    const id = identifier.trim().toLowerCase();
+    const user = getDb().users.find((u) => u.employeeId.toLowerCase() === id || u.email.toLowerCase() === id);
+
+    // Generic safe response to avoid account enumeration
+    const maskedEmail = user ? maskEmail(user.email) : maskEmail(id.includes('@') ? id : `${id}@abyssinia.et`);
+    const demoCode = '123456';
+    const key = id;
+
+    passwordResetStore.set(key, {
+      code: demoCode,
+      resetToken: `rst_${uid('t')}`,
+      expiresAt: Date.now() + 300 * 1000,
+      resendAfter: Date.now() + 60 * 1000,
+    });
+
+    return {
+      success: true,
+      identifier: identifier.trim(),
+      maskedEmail,
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 60,
+      demoCode,
+      message: 'If an account matches the details provided, a 6-digit verification code has been sent.',
+    };
+  },
+
+  async verifyResetCode({ identifier, code }) {
+    await delay(450);
+    const key = identifier.trim().toLowerCase();
+    const record = passwordResetStore.get(key);
+
+    if (record && Date.now() > record.expiresAt) {
+      throw mockError(400, 'CODE_EXPIRED', 'The verification code has expired. Please request a new code.');
+    }
+
+    const validCode = record ? record.code : '123456';
+    if (code.trim() !== validCode && code.trim() !== '123456') {
+      throw mockError(400, 'INVALID_CODE', 'Invalid verification code. Please check and try again.');
+    }
+
+    const resetToken = record?.resetToken || `rst_${uid('t')}`;
+    return {
+      success: true,
+      resetToken,
+      message: 'Verification code verified successfully.',
+    };
+  },
+
+  async resendResetCode({ identifier }) {
+    await delay(400);
+    const key = identifier.trim().toLowerCase();
+    const record = passwordResetStore.get(key);
+
+    if (record && Date.now() < record.resendAfter) {
+      throw mockError(429, 'RATE_LIMIT', 'Please wait until the 60-second cooldown expires before requesting a new code.');
+    }
+
+    const demoCode = '123456';
+    passwordResetStore.set(key, {
+      code: demoCode,
+      resetToken: record?.resetToken || `rst_${uid('t')}`,
+      expiresAt: Date.now() + 300 * 1000,
+      resendAfter: Date.now() + 60 * 1000,
+    });
+
+    return {
+      success: true,
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 60,
+      demoCode,
+      message: 'A fresh 6-digit verification code has been sent.',
+    };
+  },
+
+  async resetPassword({ identifier, newPassword }) {
+    await delay(500);
+    const id = identifier.trim().toLowerCase();
+    const user = getDb().users.find((u) => u.employeeId.toLowerCase() === id || u.email.toLowerCase() === id);
+
+    if (user) {
+      user.password = newPassword;
+      commit();
+    }
+    passwordResetStore.delete(id);
+  },
+
   async getAccountStatus(employeeId) {
     await delay(400);
     const user = getDb().users.find((u) => u.employeeId.toLowerCase() === employeeId.trim().toLowerCase() && u.role === 'staff');
@@ -129,17 +353,17 @@ const mockAuthService: AuthService = {
     return {
       employeeId: user.employeeId,
       fullName: user.fullName,
+      email: user.email,
       status: user.status,
       referenceId: user.referenceId,
       submittedAt: user.createdAt,
       decidedAt: user.approvedAt ?? null,
       rejectionReason: user.rejectionReason ?? null,
+      emailVerified: user.emailVerified,
+      emailVerifiedAt: user.emailVerifiedAt,
     };
   },
-  async requestPasswordReset() {
-    await delay(500);
-    // Intentionally generic: never reveal whether an account exists.
-  },
+
   async changePassword({ currentPassword, newPassword }) {
     await delay(400);
     const user = requireUser();

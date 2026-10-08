@@ -15,21 +15,31 @@ type StepState = 'done' | 'current' | 'upcoming' | 'failed';
 
 function Timeline({ result }: { result: AccountStatusResult }) {
   const s = result.status;
+  const isEmailPending = s === 'pending_email_verification';
   const steps: Array<{ label: string; detail: string; state: StepState }> = [
     { label: 'Registration submitted', detail: formatDateTime(result.submittedAt), state: 'done' },
     {
-      label: 'Verification',
-      detail: 'Method to be confirmed by the bank',
-      state: s === 'pending_approval' ? 'current' : s === 'rejected' ? 'done' : 'done',
+      label: 'Email verification',
+      detail: isEmailPending ? 'Awaiting verification code' : result.emailVerifiedAt ? formatDateTime(result.emailVerifiedAt) : 'Email verified',
+      state: isEmailPending ? 'current' : 'done',
     },
     {
       label: 'Manager approval',
-      detail: s === 'rejected' ? 'Not approved' : s === 'pending_approval' ? 'Awaiting review' : result.decidedAt ? formatDateTime(result.decidedAt) : 'Approved',
-      state: s === 'pending_approval' ? 'upcoming' : s === 'rejected' ? 'failed' : 'done',
+      detail:
+        s === 'rejected'
+          ? 'Not approved'
+          : s === 'pending_approval'
+          ? 'Awaiting branch manager review'
+          : result.decidedAt
+          ? formatDateTime(result.decidedAt)
+          : isEmailPending
+          ? 'Requires email verification first'
+          : 'Approved',
+      state: s === 'pending_approval' ? 'current' : s === 'rejected' ? 'failed' : s === 'active' ? 'done' : 'upcoming',
     },
     {
       label: 'Account active',
-      detail: s === 'active' ? 'You can sign in' : s === 'deactivated' ? 'Account currently deactivated' : '—',
+      detail: s === 'active' ? 'You can sign in' : s === 'deactivated' ? 'Account currently deactivated' : 'Available upon approval',
       state: s === 'active' ? 'done' : 'upcoming',
     },
   ];
@@ -138,6 +148,20 @@ export function AccountStatusPage() {
           </div>
           <div className="space-y-4 px-5 py-4">
             <Timeline result={result} />
+            {result.status === 'pending_email_verification' && (
+              <div className="space-y-3">
+                <Alert tone="warning" title="Email verification pending">
+                  Your email address has not been verified yet. Please enter the verification code sent to your registered email to advance your account to manager approval.
+                </Alert>
+                <Link
+                  to={paths.register}
+                  state={{ step: 'verify', employeeId: result.employeeId, email: result.email }}
+                  className="block"
+                >
+                  <Button fullWidth>Complete Email Verification</Button>
+                </Link>
+              </div>
+            )}
             {result.status === 'rejected' && (
               <Alert tone="danger" title="Reason provided">
                 {result.rejectionReason || 'No reason was provided. Please contact the branch manager.'}
@@ -149,7 +173,9 @@ export function AccountStatusPage() {
               </Link>
             )}
             {result.status === 'pending_approval' && (
-              <p className="text-[13px] text-zinc-500">No action needed. Check back later or contact the branch manager.</p>
+              <Alert tone="info" title="Awaiting manager review">
+                Your email has been verified. The branch manager will review and approve your account. Check back later or contact the branch.
+              </Alert>
             )}
           </div>
         </section>
