@@ -3,6 +3,7 @@ import { positionRepository } from '../../repositories/position.repository.js';
 import { toPublicUser, PublicUser } from '../auth/auth.service.js';
 import { ApiError } from '../../utils/apiError.js';
 import { sendTransactionalEmail } from '../../config/brevo.js';
+import { uploadProfilePhoto } from '../../config/cloudinary.js';
 import { renderApprovalEmail, renderRejectionEmail } from '../../utils/emailTemplates.js';
 import { recordAudit } from '../audit/audit.service.js';
 
@@ -184,7 +185,15 @@ export const staffService = {
       }
     }
 
-    const updated = await userRepository.updateProfile(userId, req);
+    let avatarUrl = req.avatarUrl;
+    if (avatarUrl && avatarUrl.startsWith('data:')) {
+      avatarUrl = await uploadProfilePhoto(avatarUrl, userId);
+    }
+
+    const updated = await userRepository.updateProfile(userId, {
+      ...req,
+      avatarUrl,
+    });
     if (!updated) {
       throw ApiError.notFound('User not found.');
     }
