@@ -196,9 +196,9 @@ const mockAuthService: AuthService = {
     commit();
 
     // Setup verification code (5 min expiration, 60s cooldown)
-    const demoCode = '123456';
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     emailVerificationStore.set(cleanEmail, {
-      code: demoCode,
+      code,
       expiresAt: Date.now() + 300 * 1000,
       resendAfter: Date.now() + 60 * 1000,
     });
@@ -210,7 +210,6 @@ const mockAuthService: AuthService = {
       employeeId: '',
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoCode,
     };
   },
 
@@ -285,9 +284,9 @@ const mockAuthService: AuthService = {
       throw mockError(429, 'RATE_LIMIT', 'Please wait until the 60-second cooldown expires before requesting a new code.');
     }
 
-    const demoCode = '123456';
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     emailVerificationStore.set(storeKey, {
-      code: demoCode,
+      code,
       expiresAt: Date.now() + 300 * 1000,
       resendAfter: Date.now() + 60 * 1000,
     });
@@ -296,7 +295,6 @@ const mockAuthService: AuthService = {
       success: true,
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoCode,
       message: 'A new 6-digit verification code has been dispatched to your email address.',
     };
   },
@@ -308,11 +306,11 @@ const mockAuthService: AuthService = {
 
     // Generic safe response to avoid account enumeration
     const maskedEmail = user ? maskEmail(user.email) : maskEmail(id.includes('@') ? id : `${id}@abyssinia.et`);
-    const demoCode = '123456';
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     const key = id;
 
     passwordResetStore.set(key, {
-      code: demoCode,
+      code,
       resetToken: `rst_${uid('t')}`,
       expiresAt: Date.now() + 300 * 1000,
       resendAfter: Date.now() + 60 * 1000,
@@ -324,7 +322,6 @@ const mockAuthService: AuthService = {
       maskedEmail,
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoCode,
       message: 'If an account matches the details provided, a 6-digit verification code has been sent.',
     };
   },
@@ -363,9 +360,9 @@ const mockAuthService: AuthService = {
       throw mockError(429, 'RATE_LIMIT', 'Please wait until the 60-second cooldown expires before requesting a new code.');
     }
 
-    const demoCode = '123456';
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     passwordResetStore.set(key, {
-      code: demoCode,
+      code,
       resetToken: record?.resetToken || `rst_${uid('t')}`,
       expiresAt: Date.now() + 300 * 1000,
       resendAfter: Date.now() + 60 * 1000,
@@ -375,7 +372,6 @@ const mockAuthService: AuthService = {
       success: true,
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoCode,
       message: 'A fresh 6-digit verification code has been sent.',
     };
   },
