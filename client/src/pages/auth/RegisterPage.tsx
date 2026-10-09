@@ -611,18 +611,18 @@ export function RegisterPage() {
 
         {/* STEP 3: Email Verified & Pending Manager Approval */}
         {step === 'pending-approval' && (
-          <div className="space-y-6 text-left py-1 animate-in fade-in duration-300">
-            {/* Header Hero Section */}
-            <div className="relative overflow-hidden rounded-2xl border border-zinc-200/90 bg-white p-5 sm:p-6 shadow-xs">
+          <div className="space-y-5 text-left py-1 animate-in fade-in duration-300">
+            {/* Header Hero */}
+            <div className="relative overflow-hidden rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-xs">
               <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-gold-500 via-amber-400 to-gold-600" />
-              
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-zinc-100">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-800">
+
+              <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-zinc-100">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
                     <ShieldCheck className="size-3.5 text-emerald-600" />
                     Email Verified
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-900">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
                     <span className="relative flex size-2">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
                       <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
@@ -632,28 +632,28 @@ export function RegisterPage() {
                 </div>
                 <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
                   <Building2 className="size-3.5 text-gold-600" />
-                  <span>Finfine Main Branch</span>
+                  <span className="hidden sm:inline">Finfine Main Branch</span>
                 </div>
               </div>
 
-              <div className="pt-4">
+              <div className="pt-3.5">
                 <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-ink-950">
-                  Account Queued for Manager Approval
+                  Registration Submitted for Approval
                 </h2>
-                <p className="mt-1.5 text-sm text-zinc-600 leading-relaxed">
-                  Your email address <strong className="text-zinc-900 font-semibold">{registeredEmail}</strong> has been authenticated. Your candidate profile is registered and pending review by Branch Manager Abebe Kebede.
+                <p className="mt-1 text-sm text-zinc-600 leading-relaxed">
+                  Your email <strong className="text-zinc-900 font-semibold">{registeredEmail}</strong> has been authenticated. Your candidate profile is queued for review by Branch Manager Abebe Kebede.
                 </p>
               </div>
             </div>
 
-            {/* Official Registration Reference Instrument */}
-            <div className="relative overflow-hidden rounded-2xl border border-gold-500/35 bg-gradient-to-br from-white via-gold-50/20 to-white p-5 sm:p-6 shadow-sm ring-1 ring-gold-500/15">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gold-500/20">
+            {/* Official Registration Reference Card */}
+            <div className="rounded-2xl border border-gold-500/35 bg-gradient-to-br from-white via-gold-50/25 to-white p-5 shadow-sm ring-1 ring-gold-500/15">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3.5 border-b border-gold-500/20">
                 <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-gold-700">
-                    Official Registration Reference
+                    Official Reference Number
                   </span>
-                  <div className="mt-1 flex items-center gap-3">
+                  <div className="mt-1 flex items-center gap-2.5">
                     <span className="font-mono text-2xl sm:text-3xl font-black text-ink-950 tracking-wider">
                       {referenceId || 'REG-PENDING'}
                     </span>
@@ -683,145 +683,70 @@ export function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-gold-500/25 bg-gold-50/60 px-3.5 py-2 sm:text-right">
+                <div className="rounded-xl border border-gold-500/20 bg-gold-50/50 px-3 py-1.5 sm:text-right">
                   <p className="text-[11px] font-medium text-gold-800">Assigned Branch</p>
                   <p className="text-xs font-bold text-ink-950">Finfine Main Branch (001)</p>
                 </div>
               </div>
 
-              {/* Candidate Quick Overview Grid */}
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-3">
+              {/* Compact Candidate Summary */}
+              <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-2.5">
                   <span className="text-zinc-500 block text-[11px]">Applicant Name</span>
-                  <span className="font-semibold text-zinc-900 text-sm mt-0.5 block truncate">
+                  <span className="font-semibold text-zinc-900 mt-0.5 block truncate">
                     {values.fullName || 'Registered Candidate'}
                   </span>
                 </div>
-                <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-3">
+                <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-2.5">
                   <span className="text-zinc-500 block text-[11px]">Assigned Position</span>
-                  <span className="font-semibold text-zinc-900 text-sm mt-0.5 block truncate">
+                  <span className="font-semibold text-zinc-900 mt-0.5 block truncate">
                     {values.position || 'Branch Staff'}
                   </span>
                 </div>
-                <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-3">
-                  <span className="text-zinc-500 block text-[11px]">Contact Email</span>
-                  <span className="font-semibold text-zinc-900 mt-0.5 block truncate">
-                    {registeredEmail}
-                  </span>
+              </div>
+            </div>
+
+            {/* Compact 3-Step Milestone Strip */}
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-3">
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200/60 p-2">
+                  <div className="flex items-center justify-center gap-1 text-emerald-700 font-bold">
+                    <Check className="size-3 stroke-[3]" />
+                    <span>Submitted</span>
+                  </div>
+                  <span className="text-[10.5px] text-emerald-600 block mt-0.5">Email Verified</span>
                 </div>
-                <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-3">
-                  <span className="text-zinc-500 block text-[11px]">Official Employee ID</span>
-                  <span className="font-medium italic text-amber-700 mt-0.5 block truncate">
-                    Pending Manager Allocation
-                  </span>
+                <div className="rounded-lg bg-amber-50 border border-amber-200/70 p-2 shadow-xs">
+                  <div className="flex items-center justify-center gap-1 text-amber-800 font-bold">
+                    <Clock className="size-3" />
+                    <span>Reviewing</span>
+                  </div>
+                  <span className="text-[10.5px] text-amber-700 block mt-0.5">Manager Queue</span>
+                </div>
+                <div className="rounded-lg bg-zinc-100/70 border border-zinc-200/60 p-2 opacity-60">
+                  <div className="flex items-center justify-center gap-1 text-zinc-600 font-medium">
+                    <Lock className="size-3" />
+                    <span>Portal Access</span>
+                  </div>
+                  <span className="text-[10.5px] text-zinc-500 block mt-0.5">Pending Step 2</span>
                 </div>
               </div>
             </div>
 
-            {/* Lifecycle Timeline */}
-            <div className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6 text-left shadow-xs">
-              <div className="flex items-center justify-between pb-4 border-b border-zinc-100">
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-900">
-                  Account Activation Journey
-                </p>
-                <span className="text-[11px] font-semibold text-gold-700 bg-gold-50 border border-gold-200/60 px-2 py-0.5 rounded-full">
-                  Phase 3 of 4 Active
-                </span>
-              </div>
+            {/* Concise Reassurance Callout */}
+            <p className="text-xs text-zinc-500 text-center leading-relaxed px-2">
+              You will receive an official notification email once Branch Manager Abebe Kebede approves your account with your assigned Employee ID.
+            </p>
 
-              <ol className="mt-5 space-y-6 relative before:absolute before:left-[15px] before:top-3 before:bottom-3 before:w-0.5 before:bg-gradient-to-b before:from-emerald-500 before:via-amber-400 before:to-zinc-200">
-                {/* Step 1: Registration Details */}
-                <li className="relative flex items-start gap-4">
-                  <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xs">
-                    <Check className="size-4 stroke-[3]" />
-                  </span>
-                  <div className="flex-1 pt-0.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-zinc-900">1. Registration Details Submitted</p>
-                      <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                        Completed
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      Applicant profile registered with Finfine Main Branch records.
-                    </p>
-                  </div>
-                </li>
-
-                {/* Step 2: Email Verification */}
-                <li className="relative flex items-start gap-4">
-                  <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-xs">
-                    <Check className="size-4 stroke-[3]" />
-                  </span>
-                  <div className="flex-1 pt-0.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-zinc-900">2. Email Authenticated</p>
-                      <span className="text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                        Verified
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      Validated ownership of {registeredEmail} via Brevo transactional code.
-                    </p>
-                  </div>
-                </li>
-
-                {/* Step 3: Manager Approval & Employee ID Assignment */}
-                <li className="relative flex items-start gap-4">
-                  <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-md ring-4 ring-amber-500/20">
-                    <Clock className="size-4 stroke-[2.5]" />
-                  </span>
-                  <div className="flex-1 pt-0.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-zinc-900">3. Manager Credential Review & Employee ID Allocation</p>
-                      <span className="text-[11px] text-amber-800 font-bold bg-amber-100/80 px-2 py-0.5 rounded-md border border-amber-300">
-                        In Progress
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-zinc-600 leading-relaxed">
-                      Branch Manager reviews registration details and allocates official BOA Employee ID (e.g. BOA-S012) in the management portal.
-                    </p>
-                  </div>
-                </li>
-
-                {/* Step 4: Account Active */}
-                <li className="relative flex items-start gap-4">
-                  <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-zinc-200 bg-zinc-50 text-zinc-400">
-                    <Lock className="size-3.5" />
-                  </span>
-                  <div className="flex-1 pt-0.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-zinc-500">4. Account Activation & Staff Access</p>
-                      <span className="text-[11px] text-zinc-400 font-medium">Pending Step 3</span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-zinc-400">
-                      Sign in using your assigned Employee ID once your official approval notification arrives.
-                    </p>
-                  </div>
-                </li>
-              </ol>
-            </div>
-
-            {/* Next Steps & Reassurance Callout */}
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 flex items-start gap-3">
-              <ShieldCheck className="size-5 text-gold-600 shrink-0 mt-0.5" />
-              <div className="text-xs leading-relaxed text-zinc-600">
-                <p className="font-semibold text-zinc-900">Important Note for Applicants</p>
-                <p className="mt-0.5">
-                  You do not need to register again. You will receive an official notification email containing your assigned Employee ID once your account is approved.
-                </p>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col-reverse sm:flex-row items-center gap-3 pt-2">
+            {/* Actions (Warm Gold Primary CTA, Clean Secondary Button) */}
+            <div className="flex flex-col-reverse sm:flex-row items-center gap-3 pt-1">
               <Button
                 type="button"
                 variant="secondary"
                 size="lg"
                 fullWidth
                 onClick={() => navigate(paths.login)}
-                className="h-12 rounded-xl font-semibold text-sm"
+                className="h-12 rounded-xl font-semibold text-sm border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700"
               >
                 Return to Sign In
               </Button>
@@ -838,7 +763,7 @@ export function RegisterPage() {
                     },
                   })
                 }
-                className="h-12 rounded-xl bg-ink-950 hover:bg-ink-900 text-white font-semibold text-sm shadow-md transition-all active:scale-[0.99] gap-2"
+                className="h-12 rounded-xl bg-gradient-to-r from-gold-500 via-amber-400 to-gold-500 hover:from-gold-400 hover:via-amber-300 hover:to-gold-400 text-ink-950 font-bold text-sm shadow-md shadow-gold-500/20 transition-all active:scale-[0.99] gap-2 border border-gold-400/40 cursor-pointer"
               >
                 <span>Track Registration Status</span>
                 <ArrowRight className="size-4" />
