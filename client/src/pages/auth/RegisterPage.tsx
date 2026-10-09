@@ -729,18 +729,8 @@ export function RegisterPage() {
               You will receive an official notification email once the Branch Manager approves your account with your assigned Employee ID.
             </p>
 
-            {/* Actions (Warm Gold Primary CTA, Clean Secondary Button) */}
-            <div className="flex flex-col-reverse sm:flex-row items-center gap-3 pt-1">
-              <Button
-                type="button"
-                variant="secondary"
-                size="lg"
-                fullWidth
-                onClick={() => navigate(paths.login)}
-                className="h-12 rounded-xl font-semibold text-sm border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700"
-              >
-                Return to Sign In
-              </Button>
+            {/* Actions (Warm Gold Primary CTA, Clean Secondary Action) */}
+            <div className="space-y-2.5 pt-2">
               <Button
                 type="button"
                 size="lg"
@@ -754,10 +744,21 @@ export function RegisterPage() {
                     },
                   })
                 }
-                className="h-12 rounded-xl bg-gradient-to-r from-gold-500 via-amber-400 to-gold-500 hover:from-gold-400 hover:via-amber-300 hover:to-gold-400 text-ink-950 font-bold text-sm shadow-md shadow-gold-500/20 transition-all active:scale-[0.99] gap-2 border border-gold-400/40 cursor-pointer"
+                className="h-12 w-full rounded-xl bg-gradient-to-r from-gold-500 via-amber-400 to-gold-500 hover:from-gold-400 hover:via-amber-300 text-ink-950 font-bold text-sm shadow-md shadow-gold-500/20 transition-all active:scale-[0.99] gap-2 border border-gold-400/40 cursor-pointer"
               >
                 <span>Track Registration Status</span>
                 <ArrowRight className="size-4" />
+              </Button>
+
+              <Button
+                type="button"
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={() => navigate(paths.login)}
+                className="h-11 w-full rounded-xl font-semibold text-sm border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 cursor-pointer"
+              >
+                Return to Sign In
               </Button>
             </div>
           </div>
