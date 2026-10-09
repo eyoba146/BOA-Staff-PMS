@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, Check, Circle, Clock, Copy, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Check, Circle, Clock, Copy, Eye, EyeOff, Lock, ShieldCheck } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthStepIndicator } from '@/components/auth/AuthStepIndicator';
@@ -630,10 +630,6 @@ export function RegisterPage() {
                     Manager Review Pending
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
-                  <Building2 className="size-3.5 text-gold-600" />
-                  <span className="hidden sm:inline">Finfine Main Branch</span>
-                </div>
               </div>
 
               <div className="pt-3.5">
@@ -641,7 +637,7 @@ export function RegisterPage() {
                   Registration Submitted for Approval
                 </h2>
                 <p className="mt-1 text-sm text-zinc-600 leading-relaxed">
-                  Your email <strong className="text-zinc-900 font-semibold">{registeredEmail}</strong> has been authenticated. Your candidate profile is queued for review by Branch Manager Abebe Kebede.
+                  Your email <strong className="text-zinc-900 font-semibold">{registeredEmail}</strong> has been authenticated. Your candidate profile is queued for review by the Branch Manager.
                 </p>
               </div>
             </div>
@@ -681,11 +677,6 @@ export function RegisterPage() {
                       )}
                     </button>
                   </div>
-                </div>
-
-                <div className="rounded-xl border border-gold-500/20 bg-gold-50/50 px-3 py-1.5 sm:text-right">
-                  <p className="text-[11px] font-medium text-gold-800">Assigned Branch</p>
-                  <p className="text-xs font-bold text-ink-950">Finfine Main Branch (001)</p>
                 </div>
               </div>
 
@@ -735,7 +726,7 @@ export function RegisterPage() {
 
             {/* Concise Reassurance Callout */}
             <p className="text-xs text-zinc-500 text-center leading-relaxed px-2">
-              You will receive an official notification email once Branch Manager Abebe Kebede approves your account with your assigned Employee ID.
+              You will receive an official notification email once the Branch Manager approves your account with your assigned Employee ID.
             </p>
 
             {/* Actions (Warm Gold Primary CTA, Clean Secondary Button) */}
