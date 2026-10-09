@@ -411,4 +411,24 @@ const mockAuthService: AuthService = {
   },
 };
 
-export const authService: AuthService = env.useMockApi ? mockAuthService : httpAuthService;
+// Slice 1, 2, and 4 Integration: Connected to live Express backend
+export const authService: AuthService = env.useMockApi
+  ? mockAuthService
+  : {
+      login: httpAuthService.login,
+      logout: httpAuthService.logout,
+      getCurrentUser: httpAuthService.getCurrentUser,
+      getAccountStatus: httpAuthService.getAccountStatus,
+      changePassword: httpAuthService.changePassword,
+
+      // Feature 2: Registration & email verification via Express + Brevo
+      register: httpAuthService.register,
+      verifyEmail: httpAuthService.verifyEmail,
+      resendEmailCode: httpAuthService.resendEmailCode,
+
+      // Feature 1: Password reset recovery via Express + Brevo
+      requestPasswordReset: httpAuthService.requestPasswordReset,
+      verifyResetCode: httpAuthService.verifyResetCode,
+      resendResetCode: httpAuthService.resendResetCode,
+      resetPassword: httpAuthService.resetPassword,
+    };

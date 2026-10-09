@@ -1,22 +1,30 @@
-import { PrismaClient } from '@prisma/client';
 import { env } from './env.js';
 import { logger } from '../utils/logger.js';
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+let prismaInstance: any = null;
 
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({
-    log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-  });
+if (env.DATABASE_URL) {
+  try {
+    // Dynamic import to prevent startup crash if prisma generate has not yet run
+    const pkg = await import('@prisma/client');
+    const PrismaClientClass = (pkg as any).PrismaClient || (pkg as any).default?.PrismaClient;
+    if (PrismaClientClass) {
+      prismaInstance = new PrismaClientClass({
+        log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+      });
+    }
+  } catch (err) {
+    logger.warn('Prisma client not yet generated; fallback active.', { error: String(err) });
+  }
+}
 
-if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+export const prisma = prismaInstance;
 
 export async function checkDatabaseConnection(): Promise<boolean> {
+  if (!prisma || !env.DATABASE_URL) {
+    return false;
+  }
   try {
-    if (!env.DATABASE_URL) {
-      return false;
-    }
     await prisma.$queryRaw`SELECT 1`;
     return true;
   } catch (err) {

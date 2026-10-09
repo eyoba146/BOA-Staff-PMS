@@ -17,14 +17,16 @@ export async function recordAudit({
   try {
     // Sanitize details if sensitive
     const sanitizedDetails = details ? JSON.stringify(details) : undefined;
-    await prisma.auditLog.create({
-      data: {
-        action,
-        actorId,
-        details: sanitizedDetails,
-        ipAddress,
-      },
-    });
+    if (prisma) {
+      await prisma.auditLog.create({
+        data: {
+          action,
+          actorId,
+          details: sanitizedDetails,
+          ipAddress,
+        },
+      });
+    }
     logger.info(`Audit log: ${action}`, { actorId });
   } catch (err) {
     // Audit logging should never crash the main transaction

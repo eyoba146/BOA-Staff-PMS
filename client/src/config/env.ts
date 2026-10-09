@@ -6,7 +6,7 @@ const metaEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.m
 const rawMock = metaEnv?.VITE_USE_MOCK_API;
 
 export const env = {
-  apiBaseUrl: (metaEnv?.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:3000/api',
-  useMockApi: rawMock === undefined ? true : String(rawMock).toLowerCase() === 'true',
+  apiBaseUrl: (metaEnv?.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:4000/api',
+  useMockApi: rawMock === undefined ? false : String(rawMock).toLowerCase() === 'true',
   appName: (metaEnv?.VITE_APP_NAME as string | undefined) ?? 'Staff Performance',
 } as const;
