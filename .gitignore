@@ -1,1 +1,7 @@
 docs/
+.env
+.env.*
+!.env.example
+scratch/
+node_modules/
+dist/

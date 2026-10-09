@@ -15,17 +15,28 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     throw ApiError.unauthorized('Invalid or expired session token.');
   }
 
-  req.user = payload;
+  req.user = {
+    ...payload,
+    id: payload.userId || payload.id,
+  };
   next();
 }
 
+export const authenticate = requireAuth;
+
+export function requireRole(role: 'staff' | 'manager') {
+  return (req: Request, res: Response, next: NextFunction) => {
+    requireAuth(req, res, () => {
+      if (!req.user || req.user.role !== role) {
+        throw ApiError.forbidden(`${role.charAt(0).toUpperCase() + role.slice(1)} authorization required for this operation.`);
+      }
+      next();
+    });
+  };
+}
+
 export function requireManager(req: Request, res: Response, next: NextFunction): void {
-  requireAuth(req, res, () => {
-    if (!req.user || req.user.role !== 'manager') {
-      throw ApiError.forbidden('Branch Manager authorization required for this operation.');
-    }
-    next();
-  });
+  requireRole('manager')(req, res, next);
 }
 
 export function requireActive(req: Request, res: Response, next: NextFunction): void {

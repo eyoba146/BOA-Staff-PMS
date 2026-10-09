@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 
 export interface TokenPayload {
   userId: string;
+  id?: string;
   role: 'staff' | 'manager';
   status: string;
 }

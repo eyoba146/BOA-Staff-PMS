@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger.js';
 export interface RecordAuditParams {
   action: string;
   actorId?: string;
-  details?: Record<string, unknown>;
+  details?: string | Record<string, unknown>;
   ipAddress?: string;
 }
 
@@ -15,8 +15,11 @@ export async function recordAudit({
   ipAddress,
 }: RecordAuditParams): Promise<void> {
   try {
-    // Sanitize details if sensitive
-    const sanitizedDetails = details ? JSON.stringify(details) : undefined;
+    const sanitizedDetails = details
+      ? typeof details === 'string'
+        ? details
+        : JSON.stringify(details)
+      : undefined;
     if (prisma) {
       await prisma.auditLog.create({
         data: {
@@ -29,7 +32,8 @@ export async function recordAudit({
     }
     logger.info(`Audit log: ${action}`, { actorId });
   } catch (err) {
-    // Audit logging should never crash the main transaction
     logger.warn('Failed to record audit log', { action, error: String(err) });
   }
 }
+
+export const recordAuditLog = recordAudit;
