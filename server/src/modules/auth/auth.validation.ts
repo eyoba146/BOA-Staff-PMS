@@ -34,16 +34,30 @@ export const registerSchema = z.object({
     .regex(/[0-9]/, 'Password must include a number.'),
 });
 
-export const verifyEmailSchema = z.object({
-  email: z.string().trim().email('Enter a valid email address.'),
-  code: z.string().trim().min(6, 'Verification code must be 6 digits.').max(6, 'Verification code must be 6 digits.'),
-  employeeId: z.string().optional(),
-});
+export const verifyEmailSchema = z
+  .object({
+    email: z.string().trim().optional(),
+    identifier: z.string().trim().optional(),
+    referenceId: z.string().trim().optional(),
+    employeeId: z.string().trim().optional(),
+    code: z.string().trim().min(6, 'Verification code must be 6 digits.').max(6, 'Verification code must be 6 digits.'),
+  })
+  .refine((data) => Boolean(data.email || data.identifier || data.referenceId || data.employeeId), {
+    message: 'An email address or identifier is required.',
+    path: ['email'],
+  });
 
-export const resendEmailCodeSchema = z.object({
-  email: z.string().trim().email('Enter a valid email address.'),
-  employeeId: z.string().optional(),
-});
+export const resendEmailCodeSchema = z
+  .object({
+    email: z.string().trim().optional(),
+    identifier: z.string().trim().optional(),
+    employeeId: z.string().trim().optional(),
+    referenceId: z.string().trim().optional(),
+  })
+  .refine((data) => Boolean(data.email || data.identifier || data.referenceId || data.employeeId), {
+    message: 'An email address or identifier is required.',
+    path: ['email'],
+  });
 
 export const forgotPasswordSchema = z.object({
   identifier: z.string().trim().min(1, 'Employee ID or registered email is required.'),

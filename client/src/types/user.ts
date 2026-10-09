@@ -54,18 +54,38 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface VerificationStatusResponse {
+  status: AccountStatus;
+  email: string;
+  referenceId?: string;
+  emailVerified: boolean;
+  purpose: 'email_verification' | 'password_reset';
+  hasActiveCode: boolean;
+  expiresAt: string | null;
+  resendAfter: string | null;
+  serverTime: string;
+  expiresInSeconds: number;
+  resendCooldownSeconds: number;
+  isExpired: boolean;
+  canResend: boolean;
+}
+
 export interface RegisterResponse {
   referenceId: string;
   status: AccountStatus;
   email: string;
   employeeId?: string;
+  expiresAt?: string;
+  resendAfter?: string;
+  serverTime?: string;
   expiresInSeconds?: number;
   resendCooldownSeconds?: number;
-  demoCode?: string;
 }
 
 export interface VerifyEmailRequest {
-  email: string;
+  email?: string;
+  identifier?: string;
+  referenceId?: string;
   code: string;
   employeeId?: string;
 }
@@ -78,15 +98,19 @@ export interface VerifyEmailResponse {
 }
 
 export interface ResendEmailCodeRequest {
-  email: string;
+  email?: string;
+  identifier?: string;
+  referenceId?: string;
   employeeId?: string;
 }
 
 export interface ResendCodeResponse {
   success: boolean;
+  expiresAt?: string;
+  resendAfter?: string;
+  serverTime?: string;
   expiresInSeconds: number;
   resendCooldownSeconds: number;
-  demoCode?: string;
   message: string;
 }
 
@@ -94,9 +118,11 @@ export interface PasswordResetRequestResponse {
   success: boolean;
   identifier: string;
   maskedEmail: string;
+  expiresAt?: string;
+  resendAfter?: string;
+  serverTime?: string;
   expiresInSeconds: number;
   resendCooldownSeconds: number;
-  demoCode?: string;
   message: string;
 }
 

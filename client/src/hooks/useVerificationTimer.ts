@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseVerificationTimerOptions {
+  /** Authoritative expiration timestamp from server */
+  expiresAt?: string | number | Date | null;
+  /** Authoritative resend eligibility timestamp from server */
+  resendAfter?: string | number | Date | null;
+  /** Authoritative server time at response moment to correct client clock skew */
+  serverTime?: string | number | Date | null;
+  /** Fallback duration in seconds if no timestamp available */
   expiresInSeconds?: number;
+  /** Fallback cooldown in seconds if no timestamp available */
   resendCooldownSeconds?: number;
   onExpire?: () => void;
+  onResendAvailable?: () => void;
   autoStart?: boolean;
 }
 
@@ -14,8 +23,17 @@ export interface UseVerificationTimerResult {
   canResend: boolean;
   formatExpires: string;
   formatResend: string;
-  restart: (newExpires?: number, newCooldown?: number) => void;
+  restart: (
+    newExpires?: string | number | Date | null,
+    newCooldown?: string | number | Date | null,
+    newServerTime?: string | number | Date | null,
+  ) => void;
   stop: () => void;
+  sync: (
+    expiresAt?: string | number | Date | null,
+    resendAfter?: string | number | Date | null,
+    serverTime?: string | number | Date | null,
+  ) => void;
 }
 
 export function formatCountdown(seconds: number): string {
@@ -25,65 +43,155 @@ export function formatCountdown(seconds: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function parseTimestamp(ts: string | number | Date | null | undefined): number | null {
+  if (ts === null || ts === undefined) return null;
+  if (typeof ts === 'number') return ts;
+  const parsed = new Date(ts).getTime();
+  return isNaN(parsed) ? null : parsed;
+}
+
 /**
- * Robust countdown timer hook for verification code expiration and resend cooldown.
- * Uses target timestamps rather than naive interval decrements to prevent tab-throttling drift.
+ * Authoritative, backend-driven countdown timer hook.
+ * Calculates remaining time from persistent server timestamps (expiresAt, resendAfter)
+ * and adjusts for client/server clock offset.
+ * Automatically recalculates on window focus and visibilitychange.
  */
 export function useVerificationTimer({
+  expiresAt,
+  resendAfter,
+  serverTime,
   expiresInSeconds = 300,
   resendCooldownSeconds = 60,
   onExpire,
+  onResendAvailable,
   autoStart = true,
 }: UseVerificationTimerOptions = {}): UseVerificationTimerResult {
-  const [expiresRemaining, setExpiresRemaining] = useState<number>(expiresInSeconds);
-  const [resendRemaining, setResendRemaining] = useState<number>(resendCooldownSeconds);
-  const [isExpired, setIsExpired] = useState(false);
+  // Clock skew offset: serverNow - clientNow
+  const serverOffsetRef = useRef<number>(0);
 
-  const expiresAtRef = useRef<number>(Date.now() + expiresInSeconds * 1000);
-  const resendAtRef = useRef<number>(Date.now() + resendCooldownSeconds * 1000);
+  const computeOffset = (srvTime?: string | number | Date | null) => {
+    const srvMs = parseTimestamp(srvTime);
+    return srvMs !== null ? srvMs - Date.now() : 0;
+  };
+
+  serverOffsetRef.current = computeOffset(serverTime);
+
+  const getTargetExpires = (exp?: string | number | Date | null, durSec = expiresInSeconds): number => {
+    const parsed = parseTimestamp(exp);
+    if (parsed !== null) return parsed;
+    return Date.now() + serverOffsetRef.current + durSec * 1000;
+  };
+
+  const getTargetResend = (res?: string | number | Date | null, coolSec = resendCooldownSeconds): number => {
+    const parsed = parseTimestamp(res);
+    if (parsed !== null) return parsed;
+    return Date.now() + serverOffsetRef.current + coolSec * 1000;
+  };
+
+  const expiresAtRef = useRef<number>(getTargetExpires(expiresAt));
+  const resendAtRef = useRef<number>(getTargetResend(resendAfter));
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
-
+  const onResendAvailableRef = useRef(onResendAvailable);
+  onResendAvailableRef.current = onResendAvailable;
   const activeRef = useRef<boolean>(autoStart);
 
-  const restart = useCallback((newExpires?: number, newCooldown?: number) => {
-    const exp = newExpires ?? expiresInSeconds;
-    const cd = newCooldown ?? resendCooldownSeconds;
-    const now = Date.now();
-    expiresAtRef.current = now + exp * 1000;
-    resendAtRef.current = now + cd * 1000;
-    setExpiresRemaining(exp);
-    setResendRemaining(cd);
-    setIsExpired(false);
-    activeRef.current = true;
-  }, [expiresInSeconds, resendCooldownSeconds]);
+  const calculateRemaining = () => {
+    const now = Date.now() + serverOffsetRef.current;
+    const expSec = Math.max(0, Math.ceil((expiresAtRef.current - now) / 1000));
+    const cdSec = Math.max(0, Math.ceil((resendAtRef.current - now) / 1000));
+    return { expSec, cdSec };
+  };
+
+  const initial = calculateRemaining();
+  const [expiresRemaining, setExpiresRemaining] = useState<number>(initial.expSec);
+  const [resendRemaining, setResendRemaining] = useState<number>(initial.cdSec);
+  const [isExpired, setIsExpired] = useState(initial.expSec <= 0);
+
+  const sync = useCallback(
+    (
+      newExpires?: string | number | Date | null,
+      newCooldown?: string | number | Date | null,
+      newServerTime?: string | number | Date | null,
+    ) => {
+      if (newServerTime !== undefined) {
+        serverOffsetRef.current = computeOffset(newServerTime);
+      }
+      if (newExpires !== undefined) {
+        expiresAtRef.current = getTargetExpires(newExpires);
+      }
+      if (newCooldown !== undefined) {
+        resendAtRef.current = getTargetResend(newCooldown);
+      }
+
+      const { expSec, cdSec } = calculateRemaining();
+      setExpiresRemaining(expSec);
+      setResendRemaining(cdSec);
+      setIsExpired(expSec <= 0);
+      activeRef.current = true;
+    },
+    [],
+  );
+
+  // Sync whenever incoming props change
+  useEffect(() => {
+    sync(expiresAt, resendAfter, serverTime);
+  }, [expiresAt, resendAfter, serverTime, sync]);
+
+  const restart = useCallback(
+    (
+      newExpires?: string | number | Date | null,
+      newCooldown?: string | number | Date | null,
+      newServerTime?: string | number | Date | null,
+    ) => {
+      sync(newExpires, newCooldown, newServerTime);
+    },
+    [sync],
+  );
 
   const stop = useCallback(() => {
     activeRef.current = false;
   }, []);
 
   useEffect(() => {
-    if (!activeRef.current) return;
-
-    const interval = setInterval(() => {
+    const tick = () => {
       if (!activeRef.current) return;
-
-      const now = Date.now();
-      const expSec = Math.max(0, Math.ceil((expiresAtRef.current - now) / 1000));
-      const cdSec = Math.max(0, Math.ceil((resendAtRef.current - now) / 1000));
+      const { expSec, cdSec } = calculateRemaining();
 
       setExpiresRemaining(expSec);
       setResendRemaining(cdSec);
 
-      if (expSec === 0) {
+      if (expSec <= 0) {
         setIsExpired(true);
         if (onExpireRef.current) {
           onExpireRef.current();
         }
+      } else {
+        setIsExpired(false);
       }
-    }, 250);
 
-    return () => clearInterval(interval);
+      if (cdSec <= 0 && onResendAvailableRef.current) {
+        onResendAvailableRef.current();
+      }
+    };
+
+    // Immediate tick
+    tick();
+
+    const interval = setInterval(tick, 500);
+
+    const onVisibilityOrFocus = () => {
+      tick();
+    };
+
+    window.addEventListener('focus', onVisibilityOrFocus);
+    document.addEventListener('visibilitychange', onVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', onVisibilityOrFocus);
+    };
   }, []);
 
   return {
@@ -95,5 +203,6 @@ export function useVerificationTimer({
     formatResend: formatCountdown(resendRemaining),
     restart,
     stop,
+    sync,
   };
 }

@@ -15,6 +15,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     throw ApiError.unauthorized('Invalid or expired session token.');
   }
 
+  if (payload.status && payload.status !== 'active') {
+    throw ApiError.forbidden('Your account is not active. Access denied.');
+  }
+
   req.user = {
     ...payload,
     id: payload.userId || payload.id,
@@ -27,7 +31,10 @@ export const authenticate = requireAuth;
 export function requireRole(role: 'staff' | 'manager') {
   return (req: Request, res: Response, next: NextFunction) => {
     requireAuth(req, res, () => {
-      if (!req.user || req.user.role !== role) {
+      if (!req.user || req.user.status !== 'active') {
+        throw ApiError.forbidden('Your account is not active.');
+      }
+      if (req.user.role !== role) {
         throw ApiError.forbidden(`${role.charAt(0).toUpperCase() + role.slice(1)} authorization required for this operation.`);
       }
       next();

@@ -1,7 +1,6 @@
-import { Clock, Mail, RotateCw, ArrowLeft, KeyRound } from 'lucide-react';
+import { Clock, Mail, RotateCw, ArrowLeft } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Alert, Button } from '@/components/ui';
-import { env } from '@/config/env';
 import { useVerificationTimer } from '@/hooks/useVerificationTimer';
 import { cn } from '@/utils/cn';
 import { VerificationCodeInput } from './VerificationCodeInput';
@@ -11,9 +10,11 @@ export interface VerificationCodeFormProps {
   subtitle?: string;
   email?: string;
   maskedEmail?: string;
+  expiresAt?: string | null;
+  resendAfter?: string | null;
+  serverTime?: string | null;
   expiresInSeconds?: number;
   resendCooldownSeconds?: number;
-  demoCode?: string;
   verifyButtonLabel?: string;
   backLabel?: string;
   onVerify: (code: string) => Promise<void>;
@@ -23,18 +24,20 @@ export interface VerificationCodeFormProps {
 }
 
 /**
- * Reusable verification-code screen pattern shared across Forgot Password and Registration.
- * Incorporates functional 5-minute code expiration, 60-second resend cooldown,
- * error and expired states, demo quick-fill in mock mode, and full accessible keyboard navigation.
+ * Reusable verification-code screen pattern shared across Password Recovery and Staff Registration.
+ * Incorporates authoritative backend expiration, 60-second server resend cooldown,
+ * error and expired states, and full accessible keyboard navigation.
  */
 export function VerificationCodeForm({
   title = 'Verification code',
   subtitle,
   email,
   maskedEmail,
+  expiresAt,
+  resendAfter,
+  serverTime,
   expiresInSeconds = 300,
   resendCooldownSeconds = 60,
-  demoCode = '123456',
   verifyButtonLabel = 'Verify code',
   backLabel = 'Back to sign in',
   onVerify,
@@ -49,6 +52,9 @@ export function VerificationCodeForm({
   const [resendNotice, setResendNotice] = useState<string | null>(null);
 
   const timer = useVerificationTimer({
+    expiresAt,
+    resendAfter,
+    serverTime,
     expiresInSeconds,
     resendCooldownSeconds,
     onExpire: () => {
@@ -93,7 +99,6 @@ export function VerificationCodeForm({
 
     try {
       await onResend();
-      timer.restart();
       setCode('');
       setResendNotice('A new 6-digit verification code has been dispatched to your email.');
     } catch (err: unknown) {
@@ -101,13 +106,6 @@ export function VerificationCodeForm({
       setError(message);
     } finally {
       setResending(false);
-    }
-  };
-
-  const handleFillDemoCode = () => {
-    if (demoCode) {
-      setCode(demoCode);
-      setError(null);
     }
   };
 
@@ -137,25 +135,6 @@ export function VerificationCodeForm({
         <Alert tone="warning">
           Your verification code has expired. Click <strong>Resend code</strong> below to receive a new one.
         </Alert>
-      )}
-
-      {/* Demo helper in mock mode */}
-      {env.useMockApi && demoCode && (
-        <div className="flex items-center justify-between rounded-lg border border-gold-500/30 bg-gold-50/60 p-2.5 text-xs text-gold-900">
-          <div className="flex items-center gap-2">
-            <KeyRound className="size-3.5 text-gold-600" />
-            <span>
-              Mock Demo Code: <strong className="font-mono text-zinc-900 font-bold">{demoCode}</strong>
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleFillDemoCode}
-            className="text-[11px] font-semibold text-gold-700 hover:text-gold-800 underline underline-offset-2 transition-colors cursor-pointer"
-          >
-            Auto-fill
-          </button>
-        </div>
       )}
 
       {/* Code Input Form */}

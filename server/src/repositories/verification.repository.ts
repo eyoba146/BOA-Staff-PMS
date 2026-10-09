@@ -26,6 +26,33 @@ export interface CreateCodeParams {
 }
 
 export const verificationRepository = {
+  async invalidateActiveCodes(
+    target: string,
+    purpose: 'email_verification' | 'password_reset',
+  ): Promise<void> {
+    const cleanTarget = target.trim().toLowerCase();
+    if (env.DATABASE_URL) {
+      try {
+        await prisma.verificationCode.updateMany({
+          where: {
+            target: cleanTarget,
+            purpose,
+            consumed: false,
+          },
+          data: { consumed: true },
+        });
+        return;
+      } catch {
+        // Fall back to memory
+      }
+    }
+    for (const c of memoryCodes) {
+      if (c.target === cleanTarget && c.purpose === purpose && !c.consumed) {
+        c.consumed = true;
+      }
+    }
+  },
+
   async createCode({
     target,
     code,
@@ -33,12 +60,21 @@ export const verificationRepository = {
     expiresInSeconds = 300,
     cooldownSeconds = 60,
     resetToken,
-  }: CreateCodeParams): Promise<{ code: string; expiresInSeconds: number; resendCooldownSeconds: number }> {
+  }: CreateCodeParams): Promise<{
+    code: string;
+    expiresAt: Date;
+    resendAfter: Date;
+    expiresInSeconds: number;
+    resendCooldownSeconds: number;
+  }> {
     const cleanTarget = target.trim().toLowerCase();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + expiresInSeconds * 1000);
     const resendAfter = new Date(now.getTime() + cooldownSeconds * 1000);
     const codeHash = hashCode(code);
+
+    // Atomically invalidate previous unconsumed codes for this target and purpose
+    await this.invalidateActiveCodes(cleanTarget, purpose);
 
     if (env.DATABASE_URL) {
       try {
@@ -53,7 +89,7 @@ export const verificationRepository = {
             resetToken,
           },
         });
-        return { code, expiresInSeconds, resendCooldownSeconds: cooldownSeconds };
+        return { code, expiresAt, resendAfter, expiresInSeconds, resendCooldownSeconds: cooldownSeconds };
       } catch {
         // Fall back to memory
       }
@@ -71,7 +107,7 @@ export const verificationRepository = {
       createdAt: now,
     });
 
-    return { code, expiresInSeconds, resendCooldownSeconds: cooldownSeconds };
+    return { code, expiresAt, resendAfter, expiresInSeconds, resendCooldownSeconds: cooldownSeconds };
   },
 
   async findLatest(
@@ -110,6 +146,46 @@ export const verificationRepository = {
 
     const matches = memoryCodes
       .filter((c) => c.target === cleanTarget && c.purpose === purpose && !c.consumed)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return matches[0] ?? null;
+  },
+
+  async findLatestAny(
+    target: string,
+    purpose: 'email_verification' | 'password_reset',
+  ): Promise<StoredVerificationCode | null> {
+    const cleanTarget = target.trim().toLowerCase();
+
+    if (env.DATABASE_URL) {
+      try {
+        const record = await prisma.verificationCode.findFirst({
+          where: {
+            target: cleanTarget,
+            purpose,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (record) {
+          return {
+            id: record.id,
+            target: record.target,
+            codeHash: record.codeHash,
+            purpose: record.purpose as 'email_verification' | 'password_reset',
+            expiresAt: record.expiresAt,
+            resendAfter: record.resendAfter,
+            consumed: record.consumed,
+            resetToken: record.resetToken,
+            createdAt: record.createdAt,
+          };
+        }
+      } catch {
+        // Fall back to memory
+      }
+    }
+
+    const matches = memoryCodes
+      .filter((c) => c.target === cleanTarget && c.purpose === purpose)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return matches[0] ?? null;

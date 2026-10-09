@@ -91,10 +91,7 @@ export const authService = {
       throw ApiError.unauthorized('The employee ID or password is incorrect.', 'INVALID_CREDENTIALS');
     }
 
-    const isValidPassword =
-      passwordPlain === 'Password@123' ||
-      passwordPlain === 'Demo@1234' ||
-      (await comparePassword(passwordPlain, user.passwordHash));
+    const isValidPassword = await comparePassword(passwordPlain, user.passwordHash);
 
     if (!isValidPassword) {
       throw ApiError.unauthorized('The employee ID or password is incorrect.', 'INVALID_CREDENTIALS');
@@ -188,15 +185,55 @@ export const authService = {
     };
   },
 
+  async getVerificationStatus(identifier: string, purpose: 'email_verification' | 'password_reset' = 'email_verification') {
+    const user = await userRepository.findByIdentifier(identifier);
+    if (!user) {
+      throw ApiError.notFound('No registration record found matching that identifier.');
+    }
+
+    const now = new Date();
+    const latestCode = await verificationRepository.findLatest(user.email, purpose);
+
+    let expiresAt: string | null = null;
+    let resendAfter: string | null = null;
+    let isExpired = true;
+    let canResend = true;
+    let expiresInSeconds = 0;
+    let resendCooldownSeconds = 0;
+
+    if (latestCode) {
+      expiresAt = latestCode.expiresAt.toISOString();
+      resendAfter = latestCode.resendAfter.toISOString();
+      isExpired = now.getTime() > latestCode.expiresAt.getTime();
+      canResend = now.getTime() >= latestCode.resendAfter.getTime();
+      expiresInSeconds = Math.max(0, Math.ceil((latestCode.expiresAt.getTime() - now.getTime()) / 1000));
+      resendCooldownSeconds = Math.max(0, Math.ceil((latestCode.resendAfter.getTime() - now.getTime()) / 1000));
+    }
+
+    return {
+      status: user.status,
+      email: user.email,
+      referenceId: user.referenceId,
+      emailVerified: user.emailVerified,
+      purpose,
+      hasActiveCode: Boolean(latestCode && !isExpired),
+      expiresAt,
+      resendAfter,
+      serverTime: now.toISOString(),
+      expiresInSeconds,
+      resendCooldownSeconds,
+      isExpired,
+      canResend,
+    };
+  },
+
   async changePassword(userId: string, currentPasswordPlain: string, newPasswordPlain: string, ipAddress?: string) {
     const user = await userRepository.findById(userId);
     if (!user) {
       throw ApiError.notFound('User not found.');
     }
 
-    const isMatch =
-      currentPasswordPlain === 'Password@123' ||
-      (await comparePassword(currentPasswordPlain, user.passwordHash));
+    const isMatch = await comparePassword(currentPasswordPlain, user.passwordHash);
 
     if (!isMatch) {
       throw ApiError.badRequest('Current password is incorrect.', 'INVALID_PASSWORD', {
@@ -228,6 +265,17 @@ export const authService = {
     const cleanEmail = data.email.trim().toLowerCase();
     const existing = await userRepository.findByEmail(cleanEmail);
     if (existing) {
+      if (existing.status === 'pending_email_verification') {
+        throw new ApiError({
+          status: 409,
+          code: 'EMAIL_VERIFICATION_PENDING',
+          message: 'An account with this email address is already registered and awaiting email verification.',
+          fieldErrors: {
+            email: cleanEmail,
+            referenceId: existing.referenceId || '',
+          },
+        });
+      }
       throw ApiError.conflict('This email address is already registered.', 'CONFLICT', {
         email: 'This email address is already registered.',
       });
@@ -261,7 +309,7 @@ export const authService = {
     });
 
     const code = generateVerificationCode();
-    await verificationRepository.createCode({
+    const codeRecord = await verificationRepository.createCode({
       target: cleanEmail,
       code,
       purpose: 'email_verification',
@@ -294,34 +342,35 @@ export const authService = {
       status: 'pending_email_verification' as const,
       email: cleanEmail,
       employeeId: '',
+      expiresAt: codeRecord.expiresAt.toISOString(),
+      resendAfter: codeRecord.resendAfter.toISOString(),
+      serverTime: new Date().toISOString(),
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoCode: env.NODE_ENV !== 'production' ? code : undefined,
     };
   },
 
-  async verifyEmail(data: { email: string; code: string; employeeId?: string }, ipAddress?: string) {
-    const targetEmail = data.email.trim().toLowerCase();
-    const user =
-      (await userRepository.findByEmail(targetEmail)) ||
-      (data.employeeId ? await userRepository.findByIdentifier(data.employeeId) : null);
+  async verifyEmail(data: { email?: string; identifier?: string; referenceId?: string; employeeId?: string; code: string }, ipAddress?: string) {
+    const target = data.email?.trim() || data.identifier?.trim() || data.referenceId?.trim() || data.employeeId?.trim() || '';
+    if (!target) {
+      throw ApiError.badRequest('Email address or identifier is required.');
+    }
 
+    const user = await userRepository.findByIdentifier(target);
     if (!user) {
       throw ApiError.notFound('Registration record not found for this account.');
     }
 
+    if (user.status === 'active') {
+      throw ApiError.badRequest('This account has already completed verification and is active. Please sign in.', 'ALREADY_ACTIVE');
+    }
+
+    if (user.status === 'pending_approval') {
+      throw ApiError.badRequest('Your email address has already been verified and is awaiting manager approval.', 'ALREADY_VERIFIED');
+    }
+
     const latestCode = await verificationRepository.findLatest(user.email, 'email_verification');
     if (!latestCode) {
-      // In non-production/dev, also allow demo code 123456 if no code stored
-      if (env.NODE_ENV !== 'production' && data.code.trim() === '123456') {
-        const verified = await userRepository.verifyEmail(user.id);
-        return {
-          success: true,
-          referenceId: verified?.referenceId || user.referenceId || '',
-          status: 'pending_approval' as const,
-          message: 'Your email has been successfully verified. Your account is now awaiting manager approval.',
-        };
-      }
       throw ApiError.badRequest('No active verification code found. Please request a new code.', 'INVALID_CODE');
     }
 
@@ -329,10 +378,7 @@ export const authService = {
       throw ApiError.badRequest('The verification code has expired. Please request a new code.', 'CODE_EXPIRED');
     }
 
-    const isMatch =
-      verificationRepository.verifyHash(data.code, latestCode.codeHash) ||
-      (env.NODE_ENV !== 'production' && data.code.trim() === '123456');
-
+    const isMatch = verificationRepository.verifyHash(data.code.trim(), latestCode.codeHash);
     if (!isMatch) {
       throw ApiError.badRequest('Invalid verification code. Please check and try again.', 'INVALID_CODE');
     }
@@ -355,27 +401,34 @@ export const authService = {
     };
   },
 
-  async resendEmailCode(data: { email: string; employeeId?: string }) {
-    const targetEmail = data.email.trim().toLowerCase();
-    const user =
-      (await userRepository.findByEmail(targetEmail)) ||
-      (data.employeeId ? await userRepository.findByIdentifier(data.employeeId) : null);
+  async resendEmailCode(data: { email?: string; identifier?: string; employeeId?: string; referenceId?: string }) {
+    const target = data.email?.trim() || data.identifier?.trim() || data.employeeId?.trim() || data.referenceId?.trim() || '';
+    if (!target) {
+      throw ApiError.badRequest('Email address or identifier is required.');
+    }
 
+    const user = await userRepository.findByIdentifier(target);
     if (!user) {
       throw ApiError.notFound('Registration record not found for this account.');
     }
 
+    if (user.status === 'active' || user.status === 'pending_approval') {
+      throw ApiError.badRequest('This account is already verified.');
+    }
+
     const latest = await verificationRepository.findLatest(user.email, 'email_verification');
-    if (latest && new Date() < latest.resendAfter) {
+    const now = new Date();
+    if (latest && now < latest.resendAfter) {
+      const remainingSec = Math.ceil((latest.resendAfter.getTime() - now.getTime()) / 1000);
       throw new ApiError({
         status: 429,
         code: 'RATE_LIMIT',
-        message: 'Please wait until the 60-second cooldown expires before requesting a new code.',
+        message: `Please wait ${remainingSec} second${remainingSec === 1 ? '' : 's'} before requesting a new code.`,
       });
     }
 
     const code = generateVerificationCode();
-    await verificationRepository.createCode({
+    const codeRecord = await verificationRepository.createCode({
       target: user.email,
       code,
       purpose: 'email_verification',
@@ -397,9 +450,11 @@ export const authService = {
 
     return {
       success: true,
+      expiresAt: codeRecord.expiresAt.toISOString(),
+      resendAfter: codeRecord.resendAfter.toISOString(),
+      serverTime: new Date().toISOString(),
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoCode: env.NODE_ENV !== 'production' ? code : undefined,
       message: 'A new 6-digit verification code has been dispatched to your email address.',
     };
   },
@@ -409,24 +464,22 @@ export const authService = {
     const user = await userRepository.findByIdentifier(identifier);
     const masked = user ? maskEmail(user.email) : maskEmail(identifier.includes('@') ? identifier : `${identifier}@abyssinia.et`);
 
-    let demoCode: string | undefined;
+    let codeRecord: { expiresAt: Date; resendAfter: Date } | undefined;
 
     if (user) {
       const latest = await verificationRepository.findLatest(user.email, 'password_reset');
-      if (latest && new Date() < latest.resendAfter) {
+      const now = new Date();
+      if (latest && now < latest.resendAfter) {
+        const remainingSec = Math.ceil((latest.resendAfter.getTime() - now.getTime()) / 1000);
         throw new ApiError({
           status: 429,
           code: 'RATE_LIMIT',
-          message: 'Please wait until the 60-second cooldown expires before requesting a new code.',
+          message: `Please wait ${remainingSec} second${remainingSec === 1 ? '' : 's'} before requesting a new code.`,
         });
       }
 
       const code = generateVerificationCode();
-      if (env.NODE_ENV !== 'production') {
-        demoCode = code;
-      }
-
-      await verificationRepository.createCode({
+      codeRecord = await verificationRepository.createCode({
         target: user.email,
         code,
         purpose: 'password_reset',
@@ -446,13 +499,19 @@ export const authService = {
       });
     }
 
+    const now = new Date();
+    const expiresAt = codeRecord ? codeRecord.expiresAt.toISOString() : new Date(now.getTime() + 300000).toISOString();
+    const resendAfter = codeRecord ? codeRecord.resendAfter.toISOString() : new Date(now.getTime() + 60000).toISOString();
+
     return {
       success: true,
       identifier,
       maskedEmail: masked,
+      expiresAt,
+      resendAfter,
+      serverTime: now.toISOString(),
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      demoCode,
       message: 'A verification code has been dispatched to your registered email address.',
     };
   },
@@ -465,16 +524,6 @@ export const authService = {
 
     const latest = await verificationRepository.findLatest(user.email, 'password_reset');
     if (!latest) {
-      if (env.NODE_ENV !== 'production' && code.trim() === '123456') {
-        const resetToken = generateResetToken();
-        await verificationRepository.createCode({
-          target: user.email,
-          code: '123456',
-          purpose: 'password_reset',
-          resetToken,
-        });
-        return { success: true, resetToken, message: 'Code verified successfully.' };
-      }
       throw ApiError.badRequest('No active password reset code found.', 'INVALID_CODE');
     }
 
@@ -482,10 +531,7 @@ export const authService = {
       throw ApiError.badRequest('The verification code has expired. Please request a new code.', 'CODE_EXPIRED');
     }
 
-    const isMatch =
-      verificationRepository.verifyHash(code, latest.codeHash) ||
-      (env.NODE_ENV !== 'production' && code.trim() === '123456');
-
+    const isMatch = verificationRepository.verifyHash(code.trim(), latest.codeHash);
     if (!isMatch) {
       throw ApiError.badRequest('Invalid verification code. Please check and try again.', 'INVALID_CODE');
     }

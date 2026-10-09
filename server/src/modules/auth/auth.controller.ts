@@ -90,6 +90,27 @@ export const authController = {
     }
   },
 
+  async getVerificationStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const identifier =
+        (req.query.identifier as string) ||
+        (req.query.email as string) ||
+        (req.query.employeeId as string) ||
+        (req.query.referenceId as string) ||
+        '';
+
+      if (!identifier.trim()) {
+        throw ApiError.badRequest('Identifier or email query parameter is required.');
+      }
+
+      const purpose = (req.query.purpose as 'email_verification' | 'password_reset') || 'email_verification';
+      const result = await authService.getVerificationStatus(identifier, purpose);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) {

@@ -167,7 +167,7 @@ export function AccountStatusPage() {
                   Your email address has not been verified yet. Please enter the verification code sent to your registered email to advance your account to manager approval.
                 </Alert>
                 <Link
-                  to={paths.register}
+                  to={`${paths.register}?step=verify${result.email ? `&email=${encodeURIComponent(result.email)}` : ''}`}
                   state={{ step: 'verify', email: result.email, referenceId: result.referenceId }}
                   className="block"
                 >

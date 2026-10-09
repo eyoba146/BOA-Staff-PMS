@@ -1,20 +1,13 @@
-import { Eye, EyeOff, IdCard, KeyRound, LogIn, Sparkles, Lock, UserCheck, Briefcase } from 'lucide-react';
+import { Eye, EyeOff, IdCard, KeyRound, LogIn, Lock } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Button, Checkbox, Field, Input } from '@/components/ui';
-import { env } from '@/config/env';
 import { useAuth } from '@/context/AuthContext';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { toApiError } from '@/services/http/apiClient';
 import { homeFor, paths } from '@/routes/paths';
-import { cn } from '@/utils/cn';
 import { hasErrors, required, validateForm } from '@/utils/validation';
-
-const DEMO_ACCOUNTS = [
-  { id: 'BOA-M001', label: 'Branch Manager', icon: Briefcase, roleDesc: 'Managerial oversight & approvals' },
-  { id: 'BOA-S001', label: 'Customer Service Officer', icon: UserCheck, roleDesc: 'Daily KPI entries & tracking' },
-];
 
 /** AUTH-01 — Login */
 export function LoginPage() {
@@ -28,7 +21,11 @@ export function LoginPage() {
   const [remember, setRemember] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<'identifier' | 'password', string>>>({});
-  const [formError, setFormError] = useState<{ code: string; message: string } | null>(null);
+  const [formError, setFormError] = useState<{
+    code: string;
+    message: string;
+    fieldErrors?: Record<string, string>;
+  } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (e: FormEvent) => {
@@ -48,15 +45,20 @@ export function LoginPage() {
       navigate(target, { replace: true });
     } catch (err) {
       const apiErr = toApiError(err);
-      setFormError({ code: apiErr.code, message: apiErr.message });
+      setFormError({
+        code: apiErr.code,
+        message: apiErr.message,
+        fieldErrors: apiErr.fieldErrors,
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   const showStatusLink = formError && ['ACCOUNT_PENDING', 'ACCOUNT_REJECTED'].includes(formError.code);
-
-  const activeDemoId = DEMO_ACCOUNTS.find((a) => a.id === values.identifier)?.id;
+  const unverifiedEmail =
+    formError?.fieldErrors?.email ||
+    (values.identifier.includes('@') ? values.identifier.trim() : '');
 
   return (
     <AuthLayout
@@ -114,61 +116,7 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Role Quick-Switch Tabs (replaces clunky demo box) */}
-        {env.useMockApi && (
-          <div className="mt-5 rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700">
-                <Sparkles className="size-3.5 text-gold-600" />
-                Quick Role Access
-              </span>
-              <span className="text-[11px] text-zinc-400">
-                Pass: <code className="font-mono text-zinc-600">Demo@1234</code>
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO_ACCOUNTS.map((a) => {
-                const isSelected = activeDemoId === a.id;
-                const Icon = a.icon;
-                return (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => {
-                      setValues({ identifier: a.id, password: 'Demo@1234' });
-                      setErrors({});
-                      setFormError(null);
-                    }}
-                    className={cn(
-                      'group flex items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-all',
-                      isSelected
-                        ? 'border-gold-500/80 bg-white shadow-xs ring-2 ring-gold-500/20'
-                        : 'border-zinc-200 bg-white/70 hover:border-zinc-300 hover:bg-white text-zinc-600 hover:text-zinc-900',
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'flex size-7 shrink-0 items-center justify-center rounded-md transition-colors',
-                        isSelected ? 'bg-gold-50 text-gold-700' : 'bg-zinc-100 text-zinc-500 group-hover:text-zinc-700',
-                      )}
-                    >
-                      <Icon className="size-3.5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={cn('truncate text-xs font-semibold', isSelected ? 'text-zinc-950' : 'text-zinc-700')}>
-                        {a.label}
-                      </p>
-                      <p className="font-mono text-[10.5px] text-zinc-400">{a.id}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={onSubmit} noValidate className="mt-5 space-y-4.5">
+        <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4.5">
           {sessionNotice && !formError && <Alert tone="warning">{sessionNotice}</Alert>}
           {formError && (
             <Alert
@@ -176,8 +124,12 @@ export function LoginPage() {
               action={
                 formError.code === 'EMAIL_NOT_VERIFIED' ? (
                   <Link
-                    to={paths.register}
-                    state={{ step: 'verify', employeeId: values.identifier }}
+                    to={`${paths.register}?step=verify${unverifiedEmail ? `&email=${encodeURIComponent(unverifiedEmail)}` : ''}`}
+                    state={{
+                      step: 'verify',
+                      email: unverifiedEmail,
+                      referenceId: formError.fieldErrors?.referenceId,
+                    }}
                     className="text-[13px] font-semibold underline underline-offset-2 hover:text-zinc-950"
                   >
                     Verify email now
@@ -185,7 +137,7 @@ export function LoginPage() {
                 ) : showStatusLink ? (
                   <Link
                     to={paths.accountStatus}
-                    state={{ employeeId: values.identifier }}
+                    state={{ employeeId: values.identifier, email: formError.fieldErrors?.email }}
                     className="text-[13px] font-medium underline underline-offset-2"
                   >
                     View status

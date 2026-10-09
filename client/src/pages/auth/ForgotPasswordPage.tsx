@@ -36,7 +36,11 @@ export function ForgotPasswordPage() {
   const [identifier, setIdentifier] = useState('');
   const [maskedEmail, setMaskedEmail] = useState('');
   const [resetToken, setResetToken] = useState('');
-  const [demoCode, setDemoCode] = useState('123456');
+  const [verificationTimestamps, setVerificationTimestamps] = useState<{
+    expiresAt: string | null;
+    resendAfter: string | null;
+    serverTime: string | null;
+  }>({ expiresAt: null, resendAfter: null, serverTime: null });
 
   // Step 1 state
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -64,7 +68,11 @@ export function ForgotPasswordPage() {
     try {
       const res = await authService.requestPasswordReset(identifier.trim());
       setMaskedEmail(res.maskedEmail);
-      if (res.demoCode) setDemoCode(res.demoCode);
+      setVerificationTimestamps({
+        expiresAt: res.expiresAt ?? null,
+        resendAfter: res.resendAfter ?? null,
+        serverTime: res.serverTime ?? null,
+      });
       setStep('verify');
     } catch (err: unknown) {
       setRequestError(toApiError(err).message);
@@ -86,7 +94,11 @@ export function ForgotPasswordPage() {
   // Step 2: Resend Code
   const handleResendCode = async () => {
     const res = await authService.resendResetCode({ identifier: identifier.trim() });
-    if (res.demoCode) setDemoCode(res.demoCode);
+    setVerificationTimestamps({
+      expiresAt: res.expiresAt ?? null,
+      resendAfter: res.resendAfter ?? null,
+      serverTime: res.serverTime ?? null,
+    });
   };
 
   // Step 3: New Password Submit
@@ -225,7 +237,9 @@ export function ForgotPasswordPage() {
             title="Verification code"
             subtitle="Enter the 6-digit code sent to your email to verify password reset authorization."
             maskedEmail={maskedEmail}
-            demoCode={demoCode}
+            expiresAt={verificationTimestamps.expiresAt}
+            resendAfter={verificationTimestamps.resendAfter}
+            serverTime={verificationTimestamps.serverTime}
             verifyButtonLabel="Verify & Create Password"
             backLabel="Change account identifier"
             onVerify={handleVerifyCode}

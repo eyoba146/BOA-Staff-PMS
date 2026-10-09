@@ -14,6 +14,13 @@ export interface StoredPosition {
 const memoryPositions: StoredPosition[] = [
   {
     id: 'pos_cso',
+    name: 'Customer Service Officer',
+    isActive: true,
+    createdAt: '2026-01-01T08:00:00.000Z',
+    updatedAt: '2026-01-01T08:00:00.000Z',
+  },
+  {
+    id: 'pos_cso_demo',
     name: 'Customer Service Officer (demo)',
     isActive: true,
     createdAt: '2026-01-01T08:00:00.000Z',
@@ -21,6 +28,13 @@ const memoryPositions: StoredPosition[] = [
   },
   {
     id: 'pos_ro',
+    name: 'Relationship Officer',
+    isActive: true,
+    createdAt: '2026-01-01T08:00:00.000Z',
+    updatedAt: '2026-01-01T08:00:00.000Z',
+  },
+  {
+    id: 'pos_ro_demo',
     name: 'Relationship Officer (demo)',
     isActive: true,
     createdAt: '2026-01-01T08:00:00.000Z',
@@ -28,6 +42,13 @@ const memoryPositions: StoredPosition[] = [
   },
   {
     id: 'pos_cash',
+    name: 'Cash Officer',
+    isActive: true,
+    createdAt: '2026-01-01T08:00:00.000Z',
+    updatedAt: '2026-01-01T08:00:00.000Z',
+  },
+  {
+    id: 'pos_cash_demo',
     name: 'Cash Officer (demo)',
     isActive: true,
     createdAt: '2026-01-01T08:00:00.000Z',
@@ -35,15 +56,15 @@ const memoryPositions: StoredPosition[] = [
   },
   {
     id: 'pos_acct',
-    name: 'Branch Accountant (demo)',
+    name: 'Branch Accountant',
     isActive: true,
     createdAt: '2026-01-01T08:00:00.000Z',
     updatedAt: '2026-01-01T08:00:00.000Z',
   },
   {
-    id: 'pos_clerk',
-    name: 'Junior Banking Clerk (demo)',
-    isActive: false,
+    id: 'pos_acct_demo',
+    name: 'Branch Accountant (demo)',
+    isActive: true,
     createdAt: '2026-01-01T08:00:00.000Z',
     updatedAt: '2026-01-01T08:00:00.000Z',
   },

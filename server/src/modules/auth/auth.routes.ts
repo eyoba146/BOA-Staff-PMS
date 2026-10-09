@@ -21,6 +21,7 @@ authRoutes.post('/login', validateBody(loginSchema), authController.login);
 authRoutes.post('/logout', authController.logout);
 authRoutes.post('/refresh', authController.refresh);
 authRoutes.get('/registration-status', authController.getRegistrationStatus);
+authRoutes.get('/verification-status', authController.getVerificationStatus);
 
 // Feature 2: Registration & email verification
 authRoutes.post('/register', validateBody(registerSchema), authController.register);

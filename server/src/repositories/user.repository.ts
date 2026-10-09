@@ -293,7 +293,9 @@ export const userRepository = {
             emailVerified: false,
           },
         });
-        return mapPrismaUser(created);
+        const mapped = mapPrismaUser(created);
+        memoryUsers.push(mapped);
+        return mapped;
       } catch {
         // Fall back to memory
       }

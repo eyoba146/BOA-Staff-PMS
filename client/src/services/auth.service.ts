@@ -13,6 +13,7 @@ import type {
   ResendResetCodeRequest,
   ResetPasswordRequest,
   User,
+  VerificationStatusResponse,
   VerifyEmailRequest,
   VerifyEmailResponse,
   VerifyResetCodeRequest,
@@ -29,6 +30,7 @@ export interface AuthService {
   /** Restore the session on app load. Resolves `null` when not signed in. */
   getCurrentUser(): Promise<User | null>;
   getAccountStatus(employeeId: string): Promise<AccountStatusResult>;
+  getVerificationStatus(identifier: string, purpose?: 'email_verification' | 'password_reset'): Promise<VerificationStatusResponse>;
   changePassword(req: ChangePasswordRequest): Promise<void>;
 
   // Feature 2: Registration & Email verification
@@ -70,6 +72,8 @@ const httpAuthService: AuthService = {
     }
   },
   getAccountStatus: (employeeId) => api.get<AccountStatusResult>('/auth/registration-status', { employeeId }),
+  getVerificationStatus: (identifier, purpose = 'email_verification') =>
+    api.get<VerificationStatusResponse>('/auth/verification-status', { identifier, purpose }),
   changePassword: (req) => api.post<void>('/auth/change-password', req),
 
   register: (req) => api.post<RegisterResponse>('/auth/register', req),
@@ -114,7 +118,7 @@ const mockAuthService: AuthService = {
     await delay(500);
     const id = identifier.trim().toLowerCase();
     const user = getDb().users.find((u) => u.employeeId.toLowerCase() === id || u.email.toLowerCase() === id);
-    if (!user || (user.password !== password && password !== 'Password@123' && password !== 'Demo@1234')) {
+    if (!user || user.password !== password) {
       throw mockError(401, 'INVALID_CREDENTIALS', 'The employee ID or password is incorrect.');
     }
     if (user.status !== 'active') {
@@ -226,12 +230,22 @@ const mockAuthService: AuthService = {
     const storeKey = targetEmail || user.email.toLowerCase() || empId || '';
     const record = emailVerificationStore.get(storeKey) || (empId ? emailVerificationStore.get(empId) : undefined);
 
-    if (record && Date.now() > record.expiresAt) {
+    if (user.status === 'active') {
+      throw mockError(400, 'ALREADY_ACTIVE', 'This account has already completed verification and is active. Please sign in.');
+    }
+    if (user.status === 'pending_approval') {
+      throw mockError(400, 'ALREADY_VERIFIED', 'Your email address has already been verified and is awaiting manager approval.');
+    }
+
+    if (!record) {
+      throw mockError(400, 'INVALID_CODE', 'No active verification code found. Please request a new code.');
+    }
+
+    if (Date.now() > record.expiresAt) {
       throw mockError(400, 'CODE_EXPIRED', 'The verification code has expired. Please request a new code.');
     }
 
-    const validCode = record ? record.code : '123456';
-    if (code.trim() !== validCode && code.trim() !== '123456') {
+    if (code.trim() !== record.code) {
       throw mockError(400, 'INVALID_CODE', 'Invalid verification code. Please check and try again.');
     }
 
@@ -320,12 +334,15 @@ const mockAuthService: AuthService = {
     const key = identifier.trim().toLowerCase();
     const record = passwordResetStore.get(key);
 
-    if (record && Date.now() > record.expiresAt) {
+    if (!record) {
+      throw mockError(400, 'INVALID_CODE', 'No active reset code found. Please request a new code.');
+    }
+
+    if (Date.now() > record.expiresAt) {
       throw mockError(400, 'CODE_EXPIRED', 'The verification code has expired. Please request a new code.');
     }
 
-    const validCode = record ? record.code : '123456';
-    if (code.trim() !== validCode && code.trim() !== '123456') {
+    if (code.trim() !== record.code) {
       throw mockError(400, 'INVALID_CODE', 'Invalid verification code. Please check and try again.');
     }
 
@@ -400,6 +417,38 @@ const mockAuthService: AuthService = {
     };
   },
 
+  async getVerificationStatus(identifier, purpose = 'email_verification') {
+    await delay(100);
+    const id = identifier.trim().toLowerCase();
+    const user = getDb().users.find(
+      (u) =>
+        u.employeeId.toLowerCase() === id ||
+        u.email.toLowerCase() === id ||
+        (u.referenceId && u.referenceId.toLowerCase() === id),
+    );
+    if (!user) {
+      throw mockError(404, 'NOT_FOUND', 'No registration record found matching that identifier.');
+    }
+    const now = Date.now();
+    const store = purpose === 'email_verification' ? emailVerificationStore : passwordResetStore;
+    const record = store.get(user.email.toLowerCase());
+    return {
+      status: user.status,
+      email: user.email,
+      referenceId: user.referenceId,
+      emailVerified: user.emailVerified ?? false,
+      purpose,
+      hasActiveCode: Boolean(record && now < record.expiresAt),
+      expiresAt: record ? new Date(record.expiresAt).toISOString() : null,
+      resendAfter: record ? new Date(record.resendAfter).toISOString() : null,
+      serverTime: new Date(now).toISOString(),
+      expiresInSeconds: record ? Math.max(0, Math.ceil((record.expiresAt - now) / 1000)) : 0,
+      resendCooldownSeconds: record ? Math.max(0, Math.ceil((record.resendAfter - now) / 1000)) : 0,
+      isExpired: record ? now > record.expiresAt : true,
+      canResend: record ? now >= record.resendAfter : true,
+    };
+  },
+
   async changePassword({ currentPassword, newPassword }) {
     await delay(400);
     const user = requireUser();
@@ -419,6 +468,7 @@ export const authService: AuthService = env.useMockApi
       logout: httpAuthService.logout,
       getCurrentUser: httpAuthService.getCurrentUser,
       getAccountStatus: httpAuthService.getAccountStatus,
+      getVerificationStatus: httpAuthService.getVerificationStatus,
       changePassword: httpAuthService.changePassword,
 
       // Feature 2: Registration & email verification via Express + Brevo
