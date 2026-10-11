@@ -32,9 +32,27 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS configuration for React frontend
+const allowedOrigins = new Set(
+  env.CLIENT_URL.split(',').map((u) => u.trim().replace(/\/$/, '')).filter(Boolean)
+);
+
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin: (origin, callback) => {
+      // Allow server-to-server or non-browser requests without origin header
+      if (!origin) return callback(null, true);
+
+      const normalized = origin.replace(/\/$/, '');
+      if (
+        allowedOrigins.has(normalized) ||
+        /^https:\/\/boa-staff-[a-z0-9-]+\.vercel\.app$/.test(normalized) ||
+        (env.NODE_ENV === 'development' && /^http:\/\/localhost:\d+$/.test(normalized))
+      ) {
+        return callback(null, true);
+      }
+
+      callback(null, false);
+    },
     credentials: true,
   })
 );
