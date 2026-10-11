@@ -287,22 +287,6 @@ export async function sendMessage(conversationId: string, senderId: string, body
     },
   });
 
-  // Update conversation updatedAt & sender's lastReadAt
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { updatedAt: now },
-  });
-
-  await prisma.conversationParticipant.update({
-    where: {
-      conversationId_userId: {
-        conversationId,
-        userId: senderId,
-      },
-    },
-    data: { lastReadAt: now },
-  });
-
   const formattedMsg = {
     id: msg.id,
     conversationId: msg.conversationId,
@@ -315,16 +299,33 @@ export async function sendMessage(conversationId: string, senderId: string, body
     isEdited: msg.isEdited,
   };
 
-  // Real-time broadcast to all participants in this conversation
-  const participants = await prisma.conversationParticipant.findMany({
-    where: { conversationId },
-    select: { userId: true },
-  });
-  const participantIds = participants.map((p: any) => p.userId);
+  // Reuse pre-fetched participants list to avoid extra database round-trip
+  const participantIds: string[] = conv.participants.map((p: any) => p.userId);
+  if (!participantIds.includes(senderId)) {
+    participantIds.push(senderId);
+  }
 
+  // Real-time broadcast and cache invalidation immediately
   realtimeService.broadcastToConversation(participantIds, 'chat_message', formattedMsg);
   realtimeService.notifyCountInvalidated(participantIds);
   participantIds.forEach((id: string) => invalidateConversationCache(id));
+
+  // Non-blocking metadata updates in background (does not delay client response)
+  Promise.all([
+    prisma.conversation.update({
+      where: { id: conversationId },
+      data: { updatedAt: now },
+    }),
+    prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: senderId,
+        },
+      },
+      data: { lastReadAt: now },
+    }),
+  ]).catch(() => {});
 
   return formattedMsg;
 }

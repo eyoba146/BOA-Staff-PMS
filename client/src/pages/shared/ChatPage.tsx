@@ -32,7 +32,6 @@ export function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messageText, setMessageText] = useState('');
-  const [sending, setSending] = useState(false);
   const [search, setSearch] = useState('');
 
   // Editing state
@@ -117,7 +116,19 @@ export function ChatPage() {
     const unsubMsg = realtimeService.on('chat_message', (newMsg: ChatMessage) => {
       if (newMsg.conversationId === activeConvIdRef.current) {
         setMessages((prev) => {
+          // If already in list by id, nothing to do
           if (prev.some((m) => m.id === newMsg.id)) return prev;
+
+          // Check if there is an optimistic temp message matching this body and sender
+          const tempIdx = prev.findIndex(
+            (m) => m.id.startsWith('temp_') && m.senderId === newMsg.senderId && m.body === newMsg.body,
+          );
+          if (tempIdx !== -1) {
+            const next = [...prev];
+            next[tempIdx] = newMsg;
+            return next;
+          }
+
           return [...prev, newMsg];
         });
       }
@@ -173,36 +184,74 @@ export function ChatPage() {
   const activeConversation = convsState.data?.find((c) => c.id === activeConvId);
 
   const handleSendMessage = async () => {
-    if (!activeConvId || !messageText.trim() || isSendingRef.current || sending) return;
+    if (!activeConvId || !messageText.trim() || isSendingRef.current) return;
     const body = messageText.trim();
     isSendingRef.current = true;
     setMessageText('');
-    setSending(true);
+
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      conversationId: activeConvId,
+      senderId: currentUser.id,
+      senderName: currentUser.fullName,
+      senderRole: currentUser.role,
+      senderPosition: currentUser.role === 'manager' ? 'Branch Manager' : (currentUser.position || 'Staff'),
+      body,
+      sentAt: new Date().toISOString(),
+      editedAt: null,
+    };
+
+    // Instant UI update (0ms latency)
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 10);
+
+    // Update sidebar snippet immediately
+    convsState.setData((prev) =>
+      prev?.map((c) =>
+        c.id === activeConvId
+          ? {
+              ...c,
+              lastMessage: optimisticMsg,
+              updatedAt: optimisticMsg.sentAt,
+            }
+          : c,
+      ),
+    );
 
     try {
-      const newMsg = await chatService.sendMessage(activeConvId, body);
+      const realMsg = await chatService.sendMessage(activeConvId, body);
+
+      // Reconcile optimistic message with verified server message
       setMessages((prev) => {
-        if (prev.some((m) => m.id === newMsg.id)) return prev;
-        return [...prev, newMsg];
+        // If already added by real-time SSE, drop the temp message
+        if (prev.some((m) => m.id === realMsg.id)) {
+          return prev.filter((m) => m.id !== tempId);
+        }
+        // Upgrade temp message in place
+        return prev.map((m) => (m.id === tempId ? realMsg : m));
       });
 
-      // update conversation snippet
       convsState.setData((prev) =>
         prev?.map((c) =>
-          c.id === activeConvId
+          c.id === activeConvId && (c.lastMessage?.id === tempId || c.lastMessage?.id === realMsg.id)
             ? {
-              ...c,
-              lastMessage: newMsg,
-              updatedAt: newMsg.sentAt,
-            }
+                ...c,
+                lastMessage: realMsg,
+                updatedAt: realMsg.sentAt,
+              }
             : c,
         ),
       );
     } catch {
-      showToast({ tone: 'danger', title: 'Failed to send', message: 'Could not deliver your message.' });
+      // Revert optimistic message and restore input on network error
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setMessageText(body);
+      showToast({ tone: 'danger', title: 'Failed to send', message: 'Could not deliver your message. Please try again.' });
     } finally {
       isSendingRef.current = false;
-      setSending(false);
     }
   };
 
@@ -274,7 +323,7 @@ export function ChatPage() {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (!isSendingRef.current && !sending) {
+      if (!isSendingRef.current) {
         void handleSendMessage();
       }
     }
@@ -496,8 +545,9 @@ export function ChatPage() {
                 ) : (
                   messages.map((msg, i) => {
                     const isMe = msg.senderId === currentUser.id;
-                    const canEdit = isMe;
-                    const canDelete = isMe || currentUser.role === 'manager';
+                    const isPending = msg.id.startsWith('temp_');
+                    const canEdit = isMe && !isPending;
+                    const canDelete = (isMe || currentUser.role === 'manager') && !isPending;
                     const prevMsg = messages[i - 1];
                     const isSameSender = prevMsg && prevMsg.senderId === msg.senderId;
                     const isEditingThis = editingMsgId === msg.id;
@@ -652,6 +702,7 @@ export function ChatPage() {
                                     'bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-bl-none',
                                     msg.editedAt && 'border-l-2 border-l-gold-500',
                                   ),
+                                isPending && 'opacity-70',
                               )}
                             >
                               <p className="whitespace-pre-line">{msg.body}</p>
@@ -668,7 +719,7 @@ export function ChatPage() {
                                   </span>
                                 )}
                                 <span className={isMe ? 'text-zinc-400' : 'text-zinc-500'}>
-                                  {formatDateTime(msg.sentAt).split(',')[1]?.trim() || ''}
+                                  {isPending ? 'Sending...' : (formatDateTime(msg.sentAt).split(',')[1]?.trim() || '')}
                                 </span>
                               </div>
                             </div>
@@ -696,8 +747,7 @@ export function ChatPage() {
                     variant="primary"
                     size="md"
                     onClick={handleSendMessage}
-                    disabled={!messageText.trim() || sending}
-                    loading={sending}
+                    disabled={!messageText.trim()}
                     aria-label="Send message"
                   >
                     <Send className="size-4" />
