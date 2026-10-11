@@ -157,7 +157,7 @@ CLIENT_URL=http://localhost:5173
 
 # Database Connection (Prisma)
 # Use transaction-mode pooling (port 6543) for runtime execution:
-DATABASE_URL="postgresql://<user>:<password>@<pooler-host>:6543/postgres?pgbouncer=true&connection_limit=10&pool_timeout=30"
+DATABASE_URL="postgresql://<user>:<password>@<pooler-host>:6543/postgres?pgbouncer=true&connection_limit=5&pool_timeout=30&connect_timeout=30"
 
 # Direct URL for migrations and schema sync (port 5432):
 DIRECT_URL="postgresql://<user>:<password>@<pooler-host>:5432/postgres?connection_limit=3&pool_timeout=30"

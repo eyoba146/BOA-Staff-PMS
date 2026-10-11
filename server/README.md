@@ -127,7 +127,7 @@ When connecting to Supabase PostgreSQL, two connection strings are required:
    - Utilizes PgBouncer connection multiplexing to support concurrent requests without exhausting PostgreSQL connection slots.
    - Example format:
      ```
-     DATABASE_URL="postgresql://postgres.<tenant>:<password>@<pooler-host>:6543/postgres?pgbouncer=true&connection_limit=10&pool_timeout=30"
+     DATABASE_URL="postgresql://postgres.<tenant>:<password>@<pooler-host>:6543/postgres?pgbouncer=true&connection_limit=5&pool_timeout=30&connect_timeout=30"
      ```
 
 2. **`DIRECT_URL` (Port 5432 - Session Mode)**:
