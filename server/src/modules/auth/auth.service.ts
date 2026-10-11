@@ -120,12 +120,13 @@ export const authService = {
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
 
-    await recordAudit({
+    // Non-blocking audit record so user login responds immediately
+    recordAudit({
       action: 'USER_LOGIN',
       actorId: user.id,
       details: { identifier, role: user.role },
       ipAddress,
-    });
+    }).catch(() => {});
 
     return {
       user: toPublicUser(user),
@@ -327,6 +328,7 @@ export const authService = {
         code,
         referenceId,
         purpose: 'registration',
+        branchName: newUser.branchName,
       }),
     });
 
@@ -445,6 +447,7 @@ export const authService = {
         code,
         referenceId: user.referenceId,
         purpose: 'registration',
+        branchName: user.branchName,
       }),
     });
 

@@ -63,10 +63,9 @@ export function StaffDetailPage() {
   const loadData = useCallback(async () => {
     if (!staffId) throw new Error('Missing staff identifier');
 
-    const [staff, summary, trend, feedbackList, allKpis, recentEntries] = await Promise.all([
+    const [staff, dashboard, feedbackList, allKpis, recentEntries] = await Promise.all([
       staffService.getById(staffId),
-      performanceService.getStaffSummary(staffId, periodState.period, periodState.date),
-      performanceService.getStaffTrend(staffId, periodState.period, periodState.date),
+      performanceService.getStaffDashboard(staffId, periodState.period, periodState.date),
       feedbackService.list({ staffId }),
       kpiService.list({ status: 'active' }),
       kpiEntryService.listForStaff(staffId),
@@ -74,7 +73,7 @@ export function StaffDetailPage() {
 
     if (!staff) throw new Error('Staff member not found');
 
-    return { staff, summary, trend, feedbackList, allKpis, recentEntries };
+    return { staff, summary: dashboard.summary, trend: dashboard.trend, feedbackList, allKpis, recentEntries };
   }, [staffId, periodState.period, periodState.date]);
 
   const state = useAsync(loadData, [loadData]);

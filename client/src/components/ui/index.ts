@@ -7,3 +7,4 @@ export * from './FormControls';
 export * from './States';
 export * from './Table';
 export * from './Tabs';
+export * from './PhoneInput';

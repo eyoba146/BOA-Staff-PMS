@@ -4,11 +4,12 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { AuthStepIndicator } from '@/components/auth/AuthStepIndicator';
 import { PositionSelect } from '@/components/auth/PositionSelect';
 import { VerificationCodeForm } from '@/components/auth/VerificationCodeForm';
-import { Alert, Button, Checkbox, Field, Input } from '@/components/ui';
+import { Alert, Button, Checkbox, Field, Input, PhoneInput } from '@/components/ui';
 import { useToast } from '@/context/ToastContext';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { authService } from '@/services/auth.service';
+import { settingsService, type PublicSettings } from '@/services/settings.service';
 import { toApiError } from '@/services/http/apiClient';
 import { paths } from '@/routes/paths';
 import { cn } from '@/utils/cn';
@@ -94,11 +95,11 @@ export function RegisterPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Verification metadata & authoritative timestamps
   const [registeredEmail, setRegisteredEmail] = useState(
     navState?.email || urlEmail,
   );
   const [referenceId, setReferenceId] = useState(navState?.referenceId || '');
+  const [branchInfo, setBranchInfo] = useState<PublicSettings | null>(null);
   const [verificationTimestamps, setVerificationTimestamps] = useState<{
     expiresAt: string | null;
     resendAfter: string | null;
@@ -138,6 +139,10 @@ export function RegisterPage() {
     if (navState?.email) setRegisteredEmail(navState.email);
     if (navState?.referenceId) setReferenceId(navState.referenceId);
   }, [navState]);
+
+  useEffect(() => {
+    settingsService.getPublicSettings().then(setBranchInfo).catch(() => undefined);
+  }, []);
 
   // Query authoritative server verification timestamps when on verify step
   useEffect(() => {
@@ -200,7 +205,11 @@ export function RegisterPage() {
     setSubmitting(true);
     try {
       const { password, ...rest } = values;
-      const res = await authService.register({ ...rest, password });
+      const res = await authService.register({
+        ...rest,
+        password,
+        branchName: branchInfo?.branchName,
+      });
       setReferenceId(res.referenceId);
       setRegisteredEmail(res.email);
       setVerificationTimestamps({
@@ -415,13 +424,17 @@ export function RegisterPage() {
                       className="h-11 rounded-xl"
                     />
                   </Field>
-                  <Field label="Phone number" error={errors.phone} required>
-                    <Input
-                      type="tel"
+                  <Field
+                    label="Phone number"
+                    error={errors.phone}
+                    required
+                    hint="e.g. 0911 234 567 or +251 91 123 4567 (10 digits for 09/07, or +251 with 9 digits)"
+                  >
+                    <PhoneInput
                       autoComplete="tel"
                       value={values.phone}
-                      onChange={set('phone')}
-                      placeholder="09XX XXX XXX"
+                      onChange={(val) => setValues((v) => ({ ...v, phone: val }))}
+                      error={errors.phone}
                       className="h-11 rounded-xl"
                     />
                   </Field>
@@ -444,6 +457,18 @@ export function RegisterPage() {
                     error={errors.position}
                   />
                 </Field>
+
+                <div className="flex items-center justify-between rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-500 font-medium">Assigned Branch:</span>
+                    <span className="font-bold text-zinc-900">{branchInfo?.branchName || 'Addis Ababa Branch'}</span>
+                  </div>
+                  {branchInfo?.branchCode && (
+                    <span className="font-mono text-[11px] font-semibold text-gold-800 bg-gold-100/70 px-2 py-0.5 rounded border border-gold-300/40">
+                      {branchInfo.branchCode}
+                    </span>
+                  )}
+                </div>
 
                 <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3.5 text-xs text-zinc-600 space-y-1">
                   <div className="flex items-center gap-2 font-medium text-zinc-900">
@@ -681,7 +706,7 @@ export function RegisterPage() {
               </div>
 
               {/* Compact Candidate Summary */}
-              <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs">
+              <div className="mt-3.5 grid grid-cols-3 gap-2 text-xs">
                 <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-2.5">
                   <span className="text-zinc-500 block text-[11px]">Applicant Name</span>
                   <span className="font-semibold text-zinc-900 mt-0.5 block truncate">
@@ -692,6 +717,12 @@ export function RegisterPage() {
                   <span className="text-zinc-500 block text-[11px]">Assigned Position</span>
                   <span className="font-semibold text-zinc-900 mt-0.5 block truncate">
                     {values.position || 'Branch Staff'}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-zinc-200/80 bg-white/90 p-2.5">
+                  <span className="text-zinc-500 block text-[11px]">Branch</span>
+                  <span className="font-semibold text-zinc-900 mt-0.5 block truncate">
+                    {branchInfo?.branchName || 'Addis Ababa Branch'}
                   </span>
                 </div>
               </div>

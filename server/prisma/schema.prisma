@@ -154,6 +154,7 @@ model KpiAssignment {
 
   @@unique([kpiId, staffId])
   @@index([staffId])
+  @@index([kpiId])
 }
 
 model KpiEntry {
@@ -173,6 +174,8 @@ model KpiEntry {
 
   @@unique([staffId, kpiId, date])
   @@index([staffId, date])
+  @@index([date])
+  @@index([kpiId])
 }
 
 model Feedback {
@@ -192,6 +195,7 @@ model Feedback {
 
   @@index([staffId])
   @@index([managerId])
+  @@index([createdAt])
 }
 
 model Announcement {
@@ -210,6 +214,8 @@ model Announcement {
   reads AnnouncementRead[]
 
   @@index([status])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 model AnnouncementRead {
@@ -243,6 +249,7 @@ model ConversationParticipant {
   lastReadAt     DateTime?
 
   @@unique([conversationId, userId])
+  @@index([userId])
 }
 
 model ChatMessage {
@@ -257,6 +264,7 @@ model ChatMessage {
   updatedAt      DateTime     @updatedAt
 
   @@index([conversationId, sentAt])
+  @@index([senderId])
 }
 
 model SystemSettings {
@@ -299,4 +307,5 @@ model AuditLog {
 
   @@index([action])
   @@index([actorId])
+  @@index([createdAt])
 }

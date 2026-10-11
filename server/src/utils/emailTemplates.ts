@@ -7,7 +7,8 @@ interface VerificationEmailOptions {
   fullName: string;
   code: string;
   referenceId?: string;
-  purpose: 'registration' | 'password_reset' | 'test';
+  purpose: 'registration' | 'password_reset' | 'test' | 'email_change';
+  branchName?: string;
 }
 
 interface ApprovalEmailOptions {
@@ -29,20 +30,26 @@ export function renderVerificationCodeEmail({
   code,
   referenceId,
   purpose,
+  branchName,
 }: VerificationEmailOptions): string {
   const isPasswordReset = purpose === 'password_reset';
   const isTest = purpose === 'test';
+  const isEmailChange = purpose === 'email_change';
 
   const headline = isPasswordReset
     ? 'Password Recovery Authorization'
     : isTest
     ? 'Email Integration Verified'
+    : isEmailChange
+    ? 'Confirm Email Address Update'
     : 'Verify Your Staff Account';
 
   const instruction = isPasswordReset
     ? 'We received a request to reset your branch workstation credentials. Please enter the following 6-digit one-time code to authorize your password update:'
     : isTest
     ? 'Your Brevo email delivery integration is officially verified and operational. Use this one-time code to complete your system validation:'
+    : isEmailChange
+    ? 'We received an official request to update the manager email address for your branch account. Please enter the following 6-digit verification code to confirm this change:'
     : 'Thank you for submitting your staff registration request. Please enter the following 6-digit one-time authorization code to confirm your email:';
 
   return `
@@ -164,7 +171,7 @@ export function renderVerificationCodeEmail({
           <tr>
             <td style="background-color: #f8fafc; padding: 26px 36px; border-top: 1px solid #e2e8f0; text-align: center;">
               <p style="margin: 0 0 6px 0; font-size: 12.5px; font-weight: 700; color: #475569;">
-                Bank of Abyssinia S.C. · Finfine Main Branch
+                Bank of Abyssinia S.C. · ${branchName || 'Branch Operations'}
               </p>
               <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.5;">
                 Internal Branch Staff Performance Management System (PMS)<br>

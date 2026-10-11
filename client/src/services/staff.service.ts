@@ -21,6 +21,12 @@ export interface StaffService {
   updateMyProfile(req: UpdateProfileRequest): Promise<User>;
   /** Active colleagues for chat/directory (both roles). */
   listDirectory(): Promise<User[]>;
+  /** Get next sequential staff Employee ID from server. */
+  getNextEmployeeId(): Promise<{ employeeId: string }>;
+  /** Request 6-digit verification code to update staff email. */
+  requestEmailChange(newEmail: string): Promise<{ success: boolean; message: string; expiresAt: string; resendAfter: string; serverTime: string }>;
+  /** Verify 6-digit code and finalize staff email update. */
+  verifyEmailChange(newEmail: string, code: string): Promise<User>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -33,6 +39,9 @@ const httpStaffService: StaffService = {
   setStatus: (id, status) => api.patch<User>(`/staff/${id}/status`, { status }),
   updateMyProfile: (req) => api.patch<User>('/staff/me', req),
   listDirectory: () => api.get<User[]>('/staff/directory'),
+  getNextEmployeeId: () => api.get<{ employeeId: string }>('/staff/next-employee-id'),
+  requestEmailChange: (newEmail) => api.post('/staff/email/request', { newEmail }),
+  verifyEmailChange: (newEmail, code) => api.post<User>('/staff/email/verify', { newEmail, code }),
 };
 
 // ---------------- Mock adapter ----------------
@@ -158,6 +167,38 @@ const mockStaffService: StaffService = {
       .users.filter((u) => u.status === 'active')
       .sort((a, b) => a.fullName.localeCompare(b.fullName))
       .map(toPublicUser);
+  },
+  async getNextEmployeeId() {
+    await delay(100);
+    const users = getDb().users;
+    let maxNum = 0;
+    for (const u of users) {
+      if (u.employeeId) {
+        const match = u.employeeId.match(/^BOA-S(\d+)$/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      }
+    }
+    return { employeeId: `BOA-S${String(maxNum + 1).padStart(3, '0')}` };
+  },
+  async requestEmailChange(newEmail: string) {
+    await delay(200);
+    return {
+      success: true,
+      message: `Verification code sent to ${newEmail}`,
+      expiresAt: new Date(Date.now() + 300000).toISOString(),
+      resendAfter: new Date(Date.now() + 60000).toISOString(),
+      serverTime: new Date().toISOString(),
+    };
+  },
+  async verifyEmailChange(newEmail: string) {
+    await delay(300);
+    const user = requireUser();
+    user.email = newEmail.trim();
+    commit();
+    return toPublicUser(user);
   },
 };
 

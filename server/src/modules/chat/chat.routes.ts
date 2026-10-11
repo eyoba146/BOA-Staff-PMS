@@ -5,6 +5,7 @@ import * as chatController from './chat.controller.js';
 export const chatRoutes = Router();
 
 chatRoutes.get('/', authenticate, chatController.listConversations);
+chatRoutes.get('/contacts', authenticate, chatController.getContacts);
 chatRoutes.post('/', authenticate, chatController.startDirect);
 
 chatRoutes.get('/:id/messages', authenticate, chatController.getMessages);

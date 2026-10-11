@@ -7,6 +7,8 @@ import {
   rejectStaffSchema,
   setStaffStatusSchema,
   updateProfileSchema,
+  staffEmailChangeRequestSchema,
+  staffEmailChangeVerifySchema,
 } from './staff.validation.js';
 
 export const staffRouter = Router();
@@ -16,8 +18,24 @@ export const staffRoutes = staffRouter;
 staffRouter.get('/directory', requireAuth, staffController.listDirectory);
 staffRouter.patch('/me', requireAuth, validateBody(updateProfileSchema), staffController.updateMyProfile);
 
+// Staff email change workflow with Brevo OTP verification
+staffRouter.post(
+  '/email/request',
+  requireAuth,
+  validateBody(staffEmailChangeRequestSchema),
+  staffController.requestEmailChange,
+);
+
+staffRouter.post(
+  '/email/verify',
+  requireAuth,
+  validateBody(staffEmailChangeVerifySchema),
+  staffController.verifyEmailChange,
+);
+
 // Manager-only approvals and staff oversight
 staffRouter.get('/pending', requireAuth, requireManager, staffController.listPending);
+staffRouter.get('/next-employee-id', requireAuth, requireManager, staffController.getNextEmployeeId);
 staffRouter.get('/', requireAuth, requireManager, staffController.list);
 staffRouter.get('/:id', requireAuth, requireManager, staffController.getById);
 

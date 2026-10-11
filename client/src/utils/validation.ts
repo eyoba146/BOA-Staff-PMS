@@ -18,9 +18,44 @@ export const minLength =
 export const email: Validator = (v) =>
   !v.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) ? undefined : 'Enter a valid email address.';
 
-/** Ethiopian mobile formats: 09XXXXXXXX, 07XXXXXXXX or +2519/+2517XXXXXXXX. */
-export const phone: Validator = (v) =>
-  !v.trim() || /^(\+251|0)[79]\d{8}$/.test(v.replace(/\s/g, '')) ? undefined : 'Enter a valid phone number (e.g. 0911 234 567).';
+export const ETHIOPIAN_PHONE_REGEX = /^(\+251[79]\d{8}|251[79]\d{8}|0[79]\d{8})$/;
+
+/**
+ * Strict Ethiopian mobile formats:
+ * - 09XXXXXXXX or 07XXXXXXXX (10 digits)
+ * - +251 9... or +251 7... / 251 9... or 251 7... (9 digits after 251)
+ */
+export const phone: Validator = (v) => {
+  if (!v.trim()) return undefined;
+  const clean = v.replace(/[\s\-()]/g, '');
+  if (!ETHIOPIAN_PHONE_REGEX.test(clean)) {
+    return 'Phone number must start with +251 9, +251 7, 09, or 07 (10 digits for 09/07, or +251 with 9 digits).';
+  }
+  return undefined;
+};
+
+export function formatEthiopianPhone(value: string): string {
+  const clean = value.replace(/[^\d+]/g, '');
+  if (clean.startsWith('+251')) {
+    const digits = clean.slice(4).replace(/\D/g, '');
+    if (digits.length <= 2) return `+251 ${digits}`;
+    if (digits.length <= 5) return `+251 ${digits.slice(0, 2)} ${digits.slice(2)}`;
+    return `+251 ${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 9)}`;
+  }
+  if (clean.startsWith('251')) {
+    const digits = clean.slice(3).replace(/\D/g, '');
+    if (digits.length <= 2) return `+251 ${digits}`;
+    if (digits.length <= 5) return `+251 ${digits.slice(0, 2)} ${digits.slice(2)}`;
+    return `+251 ${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 9)}`;
+  }
+  if (clean.startsWith('0')) {
+    const digits = clean.replace(/\D/g, '');
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 10)}`;
+  }
+  return clean;
+}
 
 export const employeeId: Validator = (v) =>
   !v.trim() || /^[A-Za-z0-9-]{3,20}$/.test(v.trim()) ? undefined : 'Use 3–20 letters, numbers or dashes.';

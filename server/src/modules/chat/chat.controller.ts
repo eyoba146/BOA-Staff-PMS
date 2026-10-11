@@ -79,3 +79,13 @@ export async function startDirect(req: Request, res: Response, next: NextFunctio
     next(err);
   }
 }
+
+export async function getContacts(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user!.id || req.user!.userId;
+    const contacts = await chatService.getContacts(userId);
+    res.json(contacts);
+  } catch (err) {
+    next(err);
+  }
+}

@@ -21,17 +21,34 @@ export const registrationStatusSchema = z.object({
   identifier: z.string().optional(),
 });
 
+export const ethiopianPhoneRegex = /^(\+251[79]\d{8}|251[79]\d{8}|0[79]\d{8})$/;
+
+export const phoneSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) => {
+      const clean = val.replace(/[\s\-()]/g, '');
+      return ethiopianPhoneRegex.test(clean);
+    },
+    {
+      message:
+        'Phone number must start with +251 9, +251 7, 09, or 07 (10 digits for 09/07, or +251 with 9 digits).',
+    },
+  );
+
 export const registerSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name must be at least 2 characters.'),
   position: z.string().trim().min(2, 'Please select a valid branch position.'),
   email: z.string().trim().email('Enter a valid email address.'),
-  phone: z.string().trim().min(9, 'Enter a valid phone number.'),
+  phone: phoneSchema,
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters.')
     .regex(/[A-Z]/, 'Password must include an uppercase letter.')
     .regex(/[a-z]/, 'Password must include a lowercase letter.')
     .regex(/[0-9]/, 'Password must include a number.'),
+  branchName: z.string().trim().optional(),
 });
 
 export const verifyEmailSchema = z

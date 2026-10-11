@@ -10,16 +10,17 @@ import {
   Lock,
   Pencil,
   Trash2,
+  ShieldCheck,
 } from 'lucide-react';
 import { useCurrentUser } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { chatService } from '@/services/chat.service';
-import { staffService } from '@/services/staff.service';
+import { chatService, type ChatContact } from '@/services/chat.service';
+import { realtimeService } from '@/services/realtime.service';
 import { useAsync } from '@/hooks/useAsync';
 import { PageHeader, ConfirmDialog } from '@/components/shared';
 import { NewConversationDialog } from '@/components/chat/NewConversationDialog';
 import { Avatar, Button, Input, SkeletonRows, EmptyState } from '@/components/ui';
-import type { ChatMessage, User } from '@/types';
+import type { ChatMessage } from '@/types';
 import { formatDateTime } from '@/utils/date';
 import { cn } from '@/utils/cn';
 
@@ -48,7 +49,7 @@ export function ChatPage() {
 
   // New conversation dialog
   const [newDialogOpened, setNewDialogOpened] = useState(false);
-  const [staffList, setStaffList] = useState<User[]>([]);
+  const [contacts, setContacts] = useState<ChatContact[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +61,7 @@ export function ChatPage() {
 
   // Load colleagues for new conversation dialog
   useEffect(() => {
-    void staffService.list({ status: 'active' }).then(setStaffList);
+    void chatService.getContacts().then(setContacts);
   }, []);
 
   // Default select first conversation (usually Branch Room) on initial load
@@ -93,6 +94,64 @@ export function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loadingMessages]);
 
+  // Real-time SSE Live Message Listener (no polling!)
+  useEffect(() => {
+    const unsubMsg = realtimeService.on('chat_message', (newMsg: ChatMessage) => {
+      if (newMsg.conversationId === activeConvId) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      }
+
+      convsState.setData((prev) =>
+        prev?.map((c) => {
+          if (c.id === newMsg.conversationId) {
+            const isCurrentlyActive = c.id === activeConvId;
+            return {
+              ...c,
+              lastMessage: newMsg,
+              unreadCount: isCurrentlyActive ? 0 : c.unreadCount + 1,
+              updatedAt: newMsg.sentAt,
+            };
+          }
+          return c;
+        }),
+      );
+    });
+
+    const unsubEdit = realtimeService.on('chat_message_updated', (updatedMsg: ChatMessage) => {
+      if (updatedMsg.conversationId === activeConvId) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)),
+        );
+      }
+      convsState.setData((prev) =>
+        prev?.map((c) => {
+          if (c.id === updatedMsg.conversationId && c.lastMessage?.id === updatedMsg.id) {
+            return { ...c, lastMessage: updatedMsg };
+          }
+          return c;
+        }),
+      );
+    });
+
+    const unsubDel = realtimeService.on(
+      'chat_message_deleted',
+      ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
+        if (conversationId === activeConvId) {
+          setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        }
+      },
+    );
+
+    return () => {
+      unsubMsg();
+      unsubEdit();
+      unsubDel();
+    };
+  }, [activeConvId, convsState]);
+
   const activeConversation = convsState.data?.find((c) => c.id === activeConvId);
 
   const handleSendMessage = async () => {
@@ -110,10 +169,10 @@ export function ChatPage() {
         prev?.map((c) =>
           c.id === activeConvId
             ? {
-                ...c,
-                lastMessage: newMsg,
-                updatedAt: newMsg.sentAt,
-              }
+              ...c,
+              lastMessage: newMsg,
+              updatedAt: newMsg.sentAt,
+            }
             : c,
         ),
       );
@@ -196,7 +255,7 @@ export function ChatPage() {
     }
   };
 
-  const handleStartConversationWithUser = async (targetUser: User) => {
+  const handleStartConversationWithUser = async (targetUser: ChatContact) => {
     try {
       const conv = await chatService.startDirect(targetUser.id);
       await convsState.reload();
@@ -288,9 +347,22 @@ export function ChatPage() {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="truncate text-xs font-semibold text-zinc-900">
-                          {conv.title}
-                        </span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate text-xs font-semibold text-zinc-900">
+                            {conv.title}
+                          </span>
+                          {!isBranch && (() => {
+                            const other = conv.participants.find((p) => p.id !== currentUser.id);
+                            if (other?.role === 'manager') {
+                              return (
+                                <span className="inline-flex items-center gap-0.5 shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 border border-amber-300">
+                                  <ShieldCheck className="size-2.5 text-amber-800" /> Manager
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                         {conv.lastMessage && (
                           <span className="shrink-0 text-[10px] text-zinc-400">
                             {formatDateTime(conv.lastMessage.sentAt).split(',')[1]?.trim() || ''}
@@ -346,17 +418,37 @@ export function ChatPage() {
                   )}
 
                   <div className="min-w-0">
-                    <h3 className="truncate text-xs font-semibold text-zinc-900">
-                      {activeConversation.title}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-xs font-semibold text-zinc-900">
+                        {activeConversation.title}
+                      </h3>
+                      {activeConversation.type !== 'branch' && (() => {
+                        const other = activeConversation.participants.find((p) => p.id !== currentUser.id);
+                        if (other?.role === 'manager') {
+                          return (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 to-gold-500/30 px-2 py-0.5 text-[10px] font-bold text-amber-950 border border-amber-400/60 shadow-xs">
+                              <ShieldCheck className="size-3 text-amber-800" /> Branch Manager
+                            </span>
+                          );
+                        }
+                        if (other?.position) {
+                          return (
+                            <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 border border-zinc-200">
+                              {other.position}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                     <p className="flex items-center gap-1.5 text-[11px] text-zinc-500">
                       {activeConversation.type === 'branch' ? (
                         <>
-                          <Users className="size-3" /> Branch-wide room
+                          <Users className="size-3 text-gold-600" /> Official Branch Room • All Active Staff & Management
                         </>
                       ) : (
                         <>
-                          <Lock className="size-3" /> Direct message
+                          <Lock className="size-3 text-zinc-400" /> Direct Private Message
                         </>
                       )}
                     </p>
@@ -384,16 +476,28 @@ export function ChatPage() {
                     const prevMsg = messages[i - 1];
                     const isSameSender = prevMsg && prevMsg.senderId === msg.senderId;
                     const isEditingThis = editingMsgId === msg.id;
+                    const isManager = msg.senderRole === 'manager';
 
                     return (
                       <div
                         key={msg.id}
                         className={cn('group relative flex flex-col', isMe ? 'items-end' : 'items-start')}
                       >
-                        {!isSameSender && !isMe && (
-                          <span className="mb-1 text-[11px] font-medium text-zinc-600">
-                            {msg.senderName}
-                          </span>
+                        {!isSameSender && (
+                          <div className={cn('mb-1 flex items-center gap-1.5', isMe ? 'justify-end' : 'justify-start')}>
+                            <span className="text-[11px] font-semibold text-zinc-700">
+                              {isMe ? 'You' : msg.senderName}
+                            </span>
+                            {isManager ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 to-gold-500/35 px-2 py-0.5 text-[9.5px] font-bold text-amber-950 border border-amber-400/60 shadow-xs">
+                                <ShieldCheck className="size-2.5 text-amber-800" /> Branch Manager
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9.5px] font-medium text-zinc-600 border border-zinc-200">
+                                {msg.senderPosition || 'Staff'}
+                              </span>
+                            )}
+                          </div>
                         )}
 
                         {isEditingThis ? (
@@ -516,13 +620,13 @@ export function ChatPage() {
                                 'max-w-[80%] rounded-lg px-3.5 py-2 text-xs leading-relaxed shadow-xs transition-all',
                                 isMe
                                   ? cn(
-                                      'bg-ink-900 text-white rounded-br-none',
-                                      msg.editedAt && 'border border-gold-500/40 ring-1 ring-gold-500/25',
-                                    )
+                                    'bg-ink-900 text-white rounded-br-none',
+                                    msg.editedAt && 'border border-gold-500/40 ring-1 ring-gold-500/25',
+                                  )
                                   : cn(
-                                      'bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-bl-none',
-                                      msg.editedAt && 'border-l-2 border-l-gold-500',
-                                    ),
+                                    'bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-bl-none',
+                                    msg.editedAt && 'border-l-2 border-l-gold-500',
+                                  ),
                               )}
                             >
                               <p className="whitespace-pre-line">{msg.body}</p>
@@ -587,7 +691,7 @@ export function ChatPage() {
       <NewConversationDialog
         open={newDialogOpened}
         onClose={() => setNewDialogOpened(false)}
-        staffList={staffList}
+        contacts={contacts}
         currentUserId={currentUser.id}
         onSelectUser={handleStartConversationWithUser}
       />

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { authService } from '@/services/auth.service';
 import { authEvents, SESSION_EXPIRED_EVENT } from '@/services/http/apiClient';
 import type { LoginRequest, User } from '@/types';
+import { realtimeService } from '@/services/realtime.service';
 
 interface AuthContextValue {
   user: User | null;
@@ -26,11 +27,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     authService
       .getCurrentUser()
-      .then((u) => active && setUser(u))
+      .then((u) => {
+        if (active && u) {
+          setUser(u);
+          realtimeService.connect();
+        }
+      })
       .finally(() => active && setInitializing(false));
 
     const onExpired = () => {
       setUser(null);
+      realtimeService.disconnect();
       setSessionNotice('Your session has expired. Please sign in again.');
     };
     authEvents.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
@@ -44,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const u = await authService.login(req);
     setSessionNotice(null);
     setUser(u);
+    realtimeService.connect();
     return u;
   }, []);
 
@@ -52,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authService.logout();
     } finally {
       setUser(null);
+      realtimeService.disconnect();
     }
   }, []);
 

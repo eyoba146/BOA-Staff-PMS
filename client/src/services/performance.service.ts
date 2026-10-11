@@ -30,8 +30,10 @@ import type { MockDb } from './mock/seed';
 export interface PerformanceService {
   getMySummary(period: PerformancePeriod, date: ISODate): Promise<PerformanceSummary>;
   getMyTrend(period: PerformancePeriod, date: ISODate): Promise<TrendPoint[]>;
+  getMyDashboard(period: PerformancePeriod, date: ISODate): Promise<{ summary: PerformanceSummary; trend: TrendPoint[] }>;
   getStaffSummary(staffId: string, period: PerformancePeriod, date: ISODate): Promise<PerformanceSummary>;
   getStaffTrend(staffId: string, period: PerformancePeriod, date: ISODate): Promise<TrendPoint[]>;
+  getStaffDashboard(staffId: string, period: PerformancePeriod, date: ISODate): Promise<{ summary: PerformanceSummary; trend: TrendPoint[] }>;
   getBranchOverview(period: PerformancePeriod, date: ISODate): Promise<BranchOverview>;
   getReport(period: PerformancePeriod, from: ISODate, to: ISODate): Promise<PerformanceReport>;
 }
@@ -40,8 +42,12 @@ export interface PerformanceService {
 const httpPerformanceService: PerformanceService = {
   getMySummary: (period, date) => api.get<PerformanceSummary>('/performance/me', { period, date }),
   getMyTrend: (period, date) => api.get<TrendPoint[]>('/performance/me/trend', { period, date }),
+  getMyDashboard: (period, date) =>
+    api.get<{ summary: PerformanceSummary; trend: TrendPoint[] }>('/performance/me/dashboard', { period, date }),
   getStaffSummary: (staffId, period, date) => api.get<PerformanceSummary>(`/performance/staff/${staffId}`, { period, date }),
   getStaffTrend: (staffId, period, date) => api.get<TrendPoint[]>(`/performance/staff/${staffId}/trend`, { period, date }),
+  getStaffDashboard: (staffId, period, date) =>
+    api.get<{ summary: PerformanceSummary; trend: TrendPoint[] }>(`/performance/staff/${staffId}/dashboard`, { period, date }),
   getBranchOverview: (period, date) => api.get<BranchOverview>('/performance/branch', { period, date }),
   getReport: (period, from, to) => api.get<PerformanceReport>('/performance/report', { period, from, to }),
 };
@@ -81,6 +87,13 @@ const mockPerformanceService: PerformanceService = {
     await delay();
     return trendFor(getDb(), [requireUser().id], period, date);
   },
+  async getMyDashboard(period, date) {
+    const [summary, trend] = await Promise.all([
+      this.getMySummary(period, date),
+      this.getMyTrend(period, date),
+    ]);
+    return { summary, trend };
+  },
   async getStaffSummary(staffId, period, date) {
     await delay();
     requireManager();
@@ -94,6 +107,13 @@ const mockPerformanceService: PerformanceService = {
     const db = getDb();
     assertStaff(db, staffId);
     return trendFor(db, [staffId], period, date);
+  },
+  async getStaffDashboard(staffId, period, date) {
+    const [summary, trend] = await Promise.all([
+      this.getStaffSummary(staffId, period, date),
+      this.getStaffTrend(staffId, period, date),
+    ]);
+    return { summary, trend };
   },
   async getBranchOverview(period, date) {
     await delay(400);

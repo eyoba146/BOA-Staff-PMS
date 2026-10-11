@@ -3,6 +3,7 @@ import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
 import { checkDatabaseConnection } from './config/database.js';
 
+// Initialize BoA Staff Performance Management System API Server (PgBouncer mode)
 const server = app.listen(env.PORT, async () => {
   logger.info(`BoA PMS Express API server listening on http://localhost:${env.PORT} (${env.NODE_ENV})`);
   logger.info(`CORS enabled for client origin: ${env.CLIENT_URL}`);

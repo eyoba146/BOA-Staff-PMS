@@ -31,12 +31,15 @@ export function toApiError(err: unknown): ApiError {
 
 // ---- Token store (in memory) ----
 let accessToken: string | null = null;
+let authCacheScope = 0;
 export const tokenStore = {
   get: () => accessToken,
   set: (token: string | null) => {
+    if (accessToken !== token) authCacheScope += 1;
     accessToken = token;
   },
   clear: () => {
+    if (accessToken !== null) authCacheScope += 1;
     accessToken = null;
   },
 };
@@ -125,10 +128,82 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
   return (await res.json()) as T;
 }
 
+// ---- In-flight deduplication & client-side response caching ----
+const inFlightRequests = new Map<string, Promise<unknown>>();
+const responseCache = new Map<string, { data: unknown; expiry: number }>();
+const DEFAULT_CACHE_TTL_MS = 20000;
+
+export function invalidateApiCache(prefix?: string) {
+  if (prefix) {
+    for (const key of responseCache.keys()) {
+      if (key.includes(prefix)) {
+        responseCache.delete(key);
+      }
+    }
+  } else {
+    responseCache.clear();
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pms:cache-invalidate', () => {
+    responseCache.clear();
+  });
+}
+
 export const api = {
-  get: <T>(path: string, query?: Query) => request<T>('GET', path, { query }),
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, { body }),
-  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, { body }),
-  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, { body }),
-  delete: <T>(path: string) => request<T>('DELETE', path),
+  get: <T>(path: string, query?: Query, opts: { noCache?: boolean; ttlMs?: number } = {}): Promise<T> => {
+    const fullUrl = buildUrl(path, query);
+    // Scope entries by authentication state so a later user cannot receive an
+    // earlier user's cached personal response after logout/login.
+    const cacheKey = `${authCacheScope}:${fullUrl}`;
+    const now = Date.now();
+
+    if (!opts.noCache) {
+      const cached = responseCache.get(cacheKey);
+      if (cached && cached.expiry > now) {
+        return Promise.resolve(cached.data as T);
+      }
+
+      const existingFlight = inFlightRequests.get(cacheKey);
+      if (existingFlight) {
+        return existingFlight as Promise<T>;
+      }
+    }
+
+    const promise = request<T>('GET', path, { query })
+      .then((data) => {
+        if (!opts.noCache) {
+          const ttl = opts.ttlMs ?? DEFAULT_CACHE_TTL_MS;
+          responseCache.set(cacheKey, { data, expiry: Date.now() + ttl });
+        }
+        return data;
+      })
+      .finally(() => {
+        inFlightRequests.delete(cacheKey);
+      });
+
+    if (!opts.noCache) {
+      inFlightRequests.set(cacheKey, promise);
+    }
+
+    return promise;
+  },
+  post: <T>(path: string, body?: unknown): Promise<T> => {
+    invalidateApiCache();
+    return request<T>('POST', path, { body });
+  },
+  patch: <T>(path: string, body?: unknown): Promise<T> => {
+    invalidateApiCache();
+    return request<T>('PATCH', path, { body });
+  },
+  put: <T>(path: string, body?: unknown): Promise<T> => {
+    invalidateApiCache();
+    return request<T>('PUT', path, { body });
+  },
+  delete: <T>(path: string): Promise<T> => {
+    invalidateApiCache();
+    return request<T>('DELETE', path);
+  },
+  invalidateCache: invalidateApiCache,
 };

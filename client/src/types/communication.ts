@@ -57,6 +57,7 @@ export interface ChatParticipant {
   id: string;
   fullName: string;
   position: string;
+  role?: 'staff' | 'manager';
 }
 
 export interface ChatMessage {
@@ -64,6 +65,8 @@ export interface ChatMessage {
   conversationId: string;
   senderId: string;
   senderName: string;
+  senderRole?: 'staff' | 'manager';
+  senderPosition?: string;
   body: string;
   sentAt: ISODateTime;
   editedAt?: ISODateTime | null;

@@ -2,11 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { randomUUID } from 'node:crypto';
 import { env } from './config/env.js';
 import { errorHandler } from './middlewares/error.middleware.js';
 import { checkDatabaseConnection } from './config/database.js';
 import { logger } from './utils/logger.js';
 import { ApiError } from './utils/apiError.js';
+import { runWithRequestContext } from './utils/request-context.js';
 
 // Module routes
 import { authRoutes } from './modules/auth/auth.routes.js';
@@ -19,6 +21,7 @@ import { feedbackRoutes } from './modules/feedback/feedback.routes.js';
 import { announcementRoutes } from './modules/announcement/announcement.routes.js';
 import { chatRoutes } from './modules/chat/chat.routes.js';
 import { settingsRoutes } from './modules/settings/settings.routes.js';
+import { realtimeRoutes } from './modules/realtime/realtime.routes.js';
 
 export const app = express();
 
@@ -38,10 +41,25 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Request Logging
+// Request diagnostics. Query strings and request bodies are intentionally excluded.
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.url}`);
-  next();
+  const requestId = randomUUID();
+  const startedAt = performance.now();
+  res.locals.requestId = requestId;
+  res.setHeader('X-Request-ID', requestId);
+
+  res.on('finish', () => {
+    if (env.NODE_ENV !== 'development') return;
+    logger.debug('API request completed', {
+      requestId,
+      method: req.method,
+      route: req.path,
+      statusCode: res.statusCode,
+      durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+    });
+  });
+
+  runWithRequestContext({ requestId }, next);
 });
 
 // Health check endpoint
@@ -67,6 +85,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/conversations', chatRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/realtime', realtimeRoutes);
 
 // 404 Catch-All
 app.use((req, res, next) => {

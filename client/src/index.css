@@ -94,6 +94,33 @@
   input[type='number'] {
     -moz-appearance: textfield;
   }
+
+  /* Interactive clickable elements: pointer cursor everywhere */
+  button,
+  [role='button'],
+  a,
+  select,
+  summary,
+  input[type='submit'],
+  input[type='reset'],
+  input[type='button'],
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='file'],
+  label[for],
+  [tabindex='0']:not(main):not(div),
+  tr[data-interactive='true'],
+  tr.cursor-pointer,
+  .cursor-pointer {
+    cursor: pointer !important;
+  }
+
+  button:disabled,
+  [aria-disabled='true'],
+  input:disabled,
+  select:disabled {
+    cursor: not-allowed !important;
+  }
 }
 
 @layer utilities {
@@ -116,5 +143,24 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0e0e10 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+  @page {
+    margin: 10mm;
+    size: auto;
   }
 }

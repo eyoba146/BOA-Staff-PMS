@@ -3,8 +3,46 @@ import { ApiError } from '../../utils/apiError.js';
 import { recordAuditLog } from '../audit/audit.service.js';
 import { getPeriodBounds } from '../../utils/date.js';
 import { entryPercent, statusFor } from '../../utils/calculations.js';
+import { invalidateOverviewCache } from '../performance/performance.service.js';
+
+interface CachedKpis {
+  data: any;
+  timestamp: number;
+}
+const kpisCache = new Map<string, CachedKpis>();
+const KPIS_CACHE_TTL = 30000;
+
+interface CachedMyAssigned {
+  data: any;
+  timestamp: number;
+}
+const myAssignedCache = new Map<string, CachedMyAssigned>();
+const MY_ASSIGNED_TTL = 30000;
+
+export function invalidateMyAssignedKpis(userId?: string) {
+  if (userId) {
+    for (const key of myAssignedCache.keys()) {
+      if (key.startsWith(`${userId}_`)) {
+        myAssignedCache.delete(key);
+      }
+    }
+  } else {
+    myAssignedCache.clear();
+  }
+}
+
+export function invalidateKpisCache() {
+  kpisCache.clear();
+  myAssignedCache.clear();
+}
 
 export async function listKpis(params: { search?: string; status?: 'all' | 'active' | 'inactive' }) {
+  const cacheKey = `${params.search ?? ''}_${params.status ?? 'all'}`;
+  const cached = kpisCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < KPIS_CACHE_TTL) {
+    return cached.data;
+  }
+
   const where: any = {};
   if (params.status === 'active') {
     where.isActive = true;
@@ -19,21 +57,23 @@ export async function listKpis(params: { search?: string; status?: 'all' | 'acti
     ];
   }
 
-  const kpis = await prisma.kpi.findMany({
-    where,
-    include: {
-      assignments: {
-        include: {
-          staff: {
-            select: { id: true, status: true },
-          },
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [kpis, activeAssignments] = await Promise.all([
+    prisma.kpi.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.kpiAssignment.findMany({
+      where: { staff: { status: 'active' } },
+      select: { kpiId: true },
+    }),
+  ]);
 
-  return kpis.map((k: any) => ({
+  const countByKpiId = new Map<string, number>();
+  for (const asgn of activeAssignments) {
+    countByKpiId.set(asgn.kpiId, (countByKpiId.get(asgn.kpiId) ?? 0) + 1);
+  }
+
+  const result = kpis.map((k: any) => ({
     id: k.id,
     name: k.name,
     description: k.description,
@@ -45,10 +85,13 @@ export async function listKpis(params: { search?: string; status?: 'all' | 'acti
     calculationRule: k.calculationRule,
     ruleStatus: k.ruleStatus,
     isActive: k.isActive,
-    assignedStaffCount: k.assignments.filter((a: any) => a.staff?.status === 'active').length,
+    assignedStaffCount: countByKpiId.get(k.id) ?? 0,
     createdAt: k.createdAt.toISOString(),
     updatedAt: k.updatedAt.toISOString(),
   }));
+
+  kpisCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  return result;
 }
 
 export async function getKpiById(id: string) {
@@ -119,6 +162,9 @@ export async function createKpi(data: any, managerId: string) {
     details: `Created KPI "${kpi.name}" (target: ${kpi.target} ${kpi.unit})`,
   });
 
+  invalidateOverviewCache();
+  invalidateKpisCache();
+
   return getKpiById(kpi.id);
 }
 
@@ -161,6 +207,9 @@ export async function updateKpi(id: string, data: any, managerId: string) {
     actorId: managerId,
     details: `Updated KPI "${updated.name}"`,
   });
+
+  invalidateOverviewCache();
+  invalidateKpisCache();
 
   return getKpiById(updated.id);
 }
@@ -221,44 +270,81 @@ export async function setKpiAssignments(kpiId: string, staffIds: string[], manag
     details: `Updated assignments for KPI "${kpi.name}" (${staffIds.length} staff assigned)`,
   });
 
+  invalidateOverviewCache();
+  invalidateKpisCache();
+
   return listAssignments({ kpiId });
 }
 
 export async function getMyAssignedKpis(userId: string, date: string) {
-  const assignments = await prisma.kpiAssignment.findMany({
-    where: {
-      staffId: userId,
-      kpi: { isActive: true },
-    },
-    include: {
-      kpi: {
-        include: {
-          assignments: {
-            include: { staff: { select: { id: true, status: true } } },
-          },
-        },
-      },
-    },
-  });
+  const cacheKey = `${userId}_${date}`;
+  const cached = myAssignedCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < MY_ASSIGNED_TTL) {
+    return cached.data;
+  }
 
-  const settings = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
+  const [assignments, settings] = await Promise.all([
+    prisma.kpiAssignment.findMany({
+      where: {
+        staffId: userId,
+        kpi: { isActive: true },
+      },
+      include: {
+        kpi: true,
+      },
+    }),
+    prisma.systemSettings.findUnique({ where: { id: 'default' } }),
+  ]);
+
+  if (assignments.length === 0) {
+    myAssignedCache.set(cacheKey, { data: [], timestamp: Date.now() });
+    return [];
+  }
+
+  const kpiIds = assignments.map((a: any) => a.kpiId);
+
+  // Find minStart bound across all assigned KPIs
+  let minStart = date;
+  for (const asgn of assignments) {
+    const b = getPeriodBounds(asgn.kpi.frequency as any, date);
+    if (b.start < minStart) minStart = b.start;
+  }
+
+  // Fetch entries and active assignment counts in parallel single queries
+  const [entries, activeStaffAssignments] = await Promise.all([
+    prisma.kpiEntry.findMany({
+      where: {
+        staffId: userId,
+        kpiId: { in: kpiIds },
+        date: { gte: minStart, lte: date },
+      },
+      orderBy: { submittedAt: 'desc' },
+    }),
+    prisma.kpiAssignment.findMany({
+      where: {
+        kpiId: { in: kpiIds },
+        staff: { status: 'active' },
+      },
+      select: { kpiId: true },
+    }),
+  ]);
+
+  const countByKpiId = new Map<string, number>();
+  for (const asgn of activeStaffAssignments) {
+    countByKpiId.set(asgn.kpiId, (countByKpiId.get(asgn.kpiId) ?? 0) + 1);
+  }
+
   const onTargetMin = settings?.onTargetMin ?? 85;
   const needsAttentionMin = settings?.needsAttentionMin ?? 70;
 
-  const result = [];
-  for (const asgn of assignments) {
+  const result = assignments.map((asgn: any) => {
     const kpi = asgn.kpi;
     const target = asgn.targetOverride ?? kpi.target;
     const bounds = getPeriodBounds(kpi.frequency as any, date);
 
-    const entry = await prisma.kpiEntry.findFirst({
-      where: {
-        staffId: userId,
-        kpiId: kpi.id,
-        date: { gte: bounds.start, lte: bounds.end },
-      },
-      orderBy: { submittedAt: 'desc' },
-    });
+    const entry = entries.find(
+      (e: any) => e.kpiId === kpi.id && e.date >= bounds.start && e.date <= bounds.end,
+    );
 
     const hydratedKpi = {
       id: kpi.id,
@@ -272,7 +358,7 @@ export async function getMyAssignedKpis(userId: string, date: string) {
       calculationRule: kpi.calculationRule,
       ruleStatus: kpi.ruleStatus,
       isActive: kpi.isActive,
-      assignedStaffCount: kpi.assignments.filter((a: any) => a.staff?.status === 'active').length,
+      assignedStaffCount: countByKpiId.get(kpi.id) ?? 0,
       createdAt: kpi.createdAt.toISOString(),
       updatedAt: kpi.updatedAt.toISOString(),
     };
@@ -298,12 +384,13 @@ export async function getMyAssignedKpis(userId: string, date: string) {
       };
     }
 
-    result.push({
+    return {
       kpi: hydratedKpi,
       target,
       entry: formattedEntry,
-    });
-  }
+    };
+  });
 
+  myAssignedCache.set(cacheKey, { data: result, timestamp: Date.now() });
   return result;
 }

@@ -4,16 +4,46 @@ import { toPublicUser, PublicUser } from '../auth/auth.service.js';
 import { ApiError } from '../../utils/apiError.js';
 import { sendTransactionalEmail } from '../../config/brevo.js';
 import { uploadProfilePhoto } from '../../config/cloudinary.js';
-import { renderApprovalEmail, renderRejectionEmail } from '../../utils/emailTemplates.js';
+import { renderApprovalEmail, renderRejectionEmail, renderVerificationCodeEmail } from '../../utils/emailTemplates.js';
 import { recordAudit } from '../audit/audit.service.js';
+import { verificationRepository } from '../../repositories/verification.repository.js';
+import { generateVerificationCode } from '../../utils/code.js';
+import { invalidateOverviewCache } from '../performance/performance.service.js';
+
+let cachedStaffList: PublicUser[] | null = null;
+let cachedStaffListTime = 0;
+let cachedPendingStaff: PublicUser[] | null = null;
+let cachedPendingStaffTime = 0;
+const STAFF_CACHE_TTL = 25000;
+
+export function invalidateStaffCache() {
+  cachedStaffList = null;
+  cachedStaffListTime = 0;
+  cachedPendingStaff = null;
+  cachedPendingStaffTime = 0;
+}
 
 export const staffService = {
   async list(filter?: { status?: string; search?: string }): Promise<PublicUser[]> {
+    if (!filter || (!filter.status && !filter.search)) {
+      if (cachedStaffList && Date.now() - cachedStaffListTime < STAFF_CACHE_TTL) {
+        return cachedStaffList;
+      }
+      const users = await userRepository.listStaff();
+      const result = users.map(toPublicUser);
+      cachedStaffList = result;
+      cachedStaffListTime = Date.now();
+      return result;
+    }
     const users = await userRepository.listStaff(filter);
     return users.map(toPublicUser);
   },
 
   async getById(id: string): Promise<PublicUser> {
+    if (cachedStaffList && Date.now() - cachedStaffListTime < STAFF_CACHE_TTL) {
+      const match = cachedStaffList.find((u) => u.id === id);
+      if (match) return match;
+    }
     const user = await userRepository.findById(id);
     if (!user || user.role !== 'staff') {
       throw ApiError.notFound('Staff member not found.');
@@ -25,8 +55,17 @@ export const staffService = {
   },
 
   async listPending(): Promise<PublicUser[]> {
+    if (cachedPendingStaff && Date.now() - cachedPendingStaffTime < STAFF_CACHE_TTL) {
+      return cachedPendingStaff;
+    }
+    if (cachedStaffList && Date.now() - cachedStaffListTime < STAFF_CACHE_TTL) {
+      return cachedStaffList.filter((u) => u.status === 'pending_approval');
+    }
     const pending = await userRepository.findPendingStaff();
-    return pending.map(toPublicUser);
+    const result = pending.map(toPublicUser);
+    cachedPendingStaff = result;
+    cachedPendingStaffTime = Date.now();
+    return result;
   },
 
   async approve(
@@ -48,13 +87,9 @@ export const staffService = {
       throw ApiError.badRequest('Candidate must complete email verification before manager approval.');
     }
 
-    const assignedEmpId = opts?.employeeId?.trim() || user.employeeId?.trim();
+    let assignedEmpId = opts?.employeeId?.trim() || user.employeeId?.trim();
     if (!assignedEmpId) {
-      throw ApiError.badRequest(
-        'Official Employee ID must be assigned by management prior to approval.',
-        'EMPLOYEE_ID_REQUIRED',
-        { employeeId: 'Official Employee ID must be assigned by management prior to approval.' },
-      );
+      assignedEmpId = await userRepository.getNextStaffEmployeeId();
     }
 
     // Check Employee ID uniqueness among other registered users
@@ -98,6 +133,9 @@ export const staffService = {
       ipAddress,
     });
 
+    invalidateOverviewCache();
+    invalidateStaffCache();
+
     return toPublicUser(approved);
   },
 
@@ -136,6 +174,9 @@ export const staffService = {
       ipAddress,
     });
 
+    invalidateOverviewCache();
+    invalidateStaffCache();
+
     return toPublicUser(rejected);
   },
 
@@ -170,29 +211,25 @@ export const staffService = {
       ipAddress,
     });
 
+    invalidateOverviewCache();
+    invalidateStaffCache();
+
     return toPublicUser(updated);
   },
 
   async updateMyProfile(
     userId: string,
-    req: { email?: string; phone?: string; avatarUrl?: string | null },
+    req: { phone?: string; avatarUrl?: string | null },
     ipAddress?: string,
   ): Promise<PublicUser> {
-    if (req.email) {
-      const duplicate = await userRepository.findByEmail(req.email);
-      if (duplicate && duplicate.id !== userId) {
-        throw ApiError.conflict('This email address is already in use by another user.');
-      }
-    }
-
     let avatarUrl = req.avatarUrl;
     if (avatarUrl && avatarUrl.startsWith('data:')) {
       avatarUrl = await uploadProfilePhoto(avatarUrl, userId);
     }
 
     const updated = await userRepository.updateProfile(userId, {
-      ...req,
-      avatarUrl,
+      ...(req.phone ? { phone: req.phone } : {}),
+      ...(avatarUrl !== undefined ? { avatarUrl } : {}),
     });
     if (!updated) {
       throw ApiError.notFound('User not found.');
@@ -208,8 +245,114 @@ export const staffService = {
     return toPublicUser(updated);
   },
 
+  async requestEmailChange(userId: string, data: { newEmail: string }, ipAddress?: string) {
+    const newEmail = data.newEmail?.trim().toLowerCase();
+    if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      throw ApiError.badRequest('Please enter a valid email address.');
+    }
+
+    const staff = await userRepository.findById(userId);
+    if (!staff || staff.role !== 'staff') {
+      throw ApiError.notFound('Staff account not found.');
+    }
+
+    if (staff.email.toLowerCase() === newEmail) {
+      throw ApiError.badRequest('New email address must be different from current email.');
+    }
+
+    const existing = await userRepository.findByEmail(newEmail);
+    if (existing && existing.id !== userId) {
+      throw ApiError.conflict('This email address is already in use by another account.');
+    }
+
+    const code = generateVerificationCode();
+    const codeRecord = await verificationRepository.createCode({
+      target: newEmail,
+      code,
+      purpose: 'email_verification',
+      expiresInSeconds: 300,
+      cooldownSeconds: 60,
+    });
+
+    await sendTransactionalEmail({
+      to: newEmail,
+      toName: staff.fullName,
+      subject: 'Bank of Abyssinia — Verify Staff Email Update',
+      htmlContent: renderVerificationCodeEmail({
+        fullName: staff.fullName,
+        code,
+        purpose: 'email_change',
+        branchName: staff.branchName,
+      }),
+    });
+
+    await recordAudit({
+      action: 'REQUEST_STAFF_EMAIL_CHANGE',
+      actorId: userId,
+      details: { staffId: userId, fromEmail: staff.email, newEmail },
+      ipAddress,
+    });
+
+    return {
+      success: true,
+      message: `Verification code sent to ${newEmail}.`,
+      expiresAt: codeRecord.expiresAt.toISOString(),
+      resendAfter: codeRecord.resendAfter.toISOString(),
+      serverTime: new Date().toISOString(),
+    };
+  },
+
+  async verifyEmailChange(userId: string, data: { newEmail: string; code: string }, ipAddress?: string): Promise<PublicUser> {
+    const newEmail = data.newEmail?.trim().toLowerCase();
+    const code = data.code?.trim();
+
+    if (!newEmail || !code) {
+      throw ApiError.badRequest('New email address and 6-digit verification code are required.');
+    }
+
+    const staff = await userRepository.findById(userId);
+    if (!staff || staff.role !== 'staff') {
+      throw ApiError.notFound('Staff account not found.');
+    }
+
+    const validCode = await verificationRepository.findLatest(newEmail, 'email_verification');
+    if (!validCode || validCode.consumed || new Date() > validCode.expiresAt) {
+      throw ApiError.badRequest('Verification code has expired or was not requested. Please request a new code.');
+    }
+
+    if (!verificationRepository.verifyHash(code, validCode.codeHash)) {
+      throw ApiError.badRequest('Incorrect verification code. Please check your email and try again.');
+    }
+
+    // Verify uniqueness again
+    const existing = await userRepository.findByEmail(newEmail);
+    if (existing && existing.id !== userId) {
+      throw ApiError.conflict('This email address is already in use by another account.');
+    }
+
+    await verificationRepository.markConsumed(validCode.id);
+
+    const updated = await userRepository.updateProfile(userId, { email: newEmail });
+    if (!updated) {
+      throw ApiError.internal('Failed to update email address.');
+    }
+
+    await recordAudit({
+      action: 'VERIFY_STAFF_EMAIL_CHANGE',
+      actorId: userId,
+      details: { staffId: userId, previousEmail: staff.email, updatedEmail: newEmail },
+      ipAddress,
+    });
+
+    return toPublicUser(updated);
+  },
+
   async listDirectory(): Promise<PublicUser[]> {
     const activeUsers = await userRepository.listDirectory();
     return activeUsers.map(toPublicUser);
+  },
+
+  async getNextEmployeeId(): Promise<string> {
+    return userRepository.getNextStaffEmployeeId();
   },
 };

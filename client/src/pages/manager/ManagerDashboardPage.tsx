@@ -7,6 +7,7 @@ import {
   UserCheck,
   ArrowRight,
   Target,
+  Megaphone,
 } from 'lucide-react';
 import { performanceService } from '@/services/performance.service';
 import { useAsync } from '@/hooks/useAsync';
@@ -41,6 +42,11 @@ export function ManagerDashboardPage() {
         documentTitle="Branch Dashboard"
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Link to={paths.manager.announcements}>
+              <Button variant="primary" size="sm" leftIcon={<Megaphone className="size-3.5" />}>
+                Post Announcement
+              </Button>
+            </Link>
             <Link to={paths.manager.performance}>
               <Button variant="secondary" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
                 Detailed Monitoring
@@ -102,7 +108,7 @@ export function ManagerDashboardPage() {
                   value={overview.pendingApprovals}
                   meta={
                     overview.pendingApprovals > 0 ? (
-                      <Link to={paths.manager.staff} className="font-semibold text-gold-700 underline">
+                      <Link to={`${paths.manager.staff}?tab=pending`} className="font-semibold text-gold-700 underline">
                         Review staff applications
                       </Link>
                     ) : (
@@ -112,6 +118,35 @@ export function ManagerDashboardPage() {
                   icon={UserCheck}
                 />
               </div>
+
+              {/* Executive Pending Approvals Alert Banner */}
+              {overview.pendingApprovals > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-amber-300/80 bg-gradient-to-r from-amber-500/15 via-amber-50/70 to-white p-4 sm:p-5 shadow-sm">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gold-500 text-ink-950 shadow-md">
+                      <UserCheck className="size-6 stroke-[2.2]" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm sm:text-base font-bold text-ink-950">
+                          {overview.pendingApprovals} Staff Registration{overview.pendingApprovals > 1 ? 's' : ''} Awaiting Clearance
+                        </h4>
+                        <span className="rounded-full bg-gold-400 px-2 py-0.5 text-[11px] font-extrabold text-ink-950 animate-pulse">
+                          Action Required
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-zinc-600">
+                        Applicants have completed email verification and are waiting for official Employee ID provisioning.
+                      </p>
+                    </div>
+                  </div>
+                  <Link to={`${paths.manager.staff}?tab=pending`}>
+                    <Button variant="primary" size="sm" rightIcon={<ArrowRight className="size-3.5" />} className="font-bold shrink-0">
+                      Clear Applications
+                    </Button>
+                  </Link>
+                </div>
+              )}
 
               {/* Main Content Grid: Trend + Attention & Breakdown */}
               <div className="grid gap-6 lg:grid-cols-3">

@@ -1,11 +1,46 @@
 import { prisma } from '../../config/database.js';
 import { ApiError } from '../../utils/apiError.js';
 import { recordAuditLog } from '../audit/audit.service.js';
+import { realtimeService } from '../realtime/realtime.service.js';
+
+interface CachedFeedback {
+  data: any;
+  timestamp: number;
+}
+
+const feedbackCache = new Map<string, CachedFeedback>();
+const FEEDBACK_CACHE_TTL = 30000;
+
+export function invalidateFeedbackCache(staffId?: string) {
+  if (staffId) {
+    feedbackCache.delete(`received_${staffId}`);
+    feedbackCache.delete('all_');
+    feedbackCache.delete(`all_${staffId}`);
+  } else {
+    feedbackCache.clear();
+  }
+}
 
 export async function listReceivedFeedback(staffId: string) {
+  const cacheKey = `received_${staffId}`;
+  const cached = feedbackCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < FEEDBACK_CACHE_TTL) {
+    return cached.data;
+  }
+
   const list = await prisma.feedback.findMany({
     where: { staffId },
-    include: {
+    select: {
+      id: true,
+      staffId: true,
+      managerId: true,
+      subject: true,
+      message: true,
+      period: true,
+      periodLabel: true,
+      kpiId: true,
+      readAt: true,
+      createdAt: true,
       staff: { select: { fullName: true } },
       manager: { select: { fullName: true } },
       kpi: { select: { name: true } },
@@ -13,7 +48,7 @@ export async function listReceivedFeedback(staffId: string) {
     orderBy: { createdAt: 'desc' },
   });
 
-  return list.map((f: any) => ({
+  const result = list.map((f: any) => ({
     id: f.id,
     staffId: f.staffId,
     staffName: f.staff.fullName,
@@ -28,9 +63,18 @@ export async function listReceivedFeedback(staffId: string) {
     readAt: f.readAt ? f.readAt.toISOString() : null,
     createdAt: f.createdAt.toISOString(),
   }));
+
+  feedbackCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  return result;
 }
 
 export async function listAllFeedback(filter?: { staffId?: string }) {
+  const cacheKey = `all_${filter?.staffId ?? ''}`;
+  const cached = feedbackCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < FEEDBACK_CACHE_TTL) {
+    return cached.data;
+  }
+
   const where: any = {};
   if (filter?.staffId) {
     where.staffId = filter.staffId;
@@ -38,7 +82,17 @@ export async function listAllFeedback(filter?: { staffId?: string }) {
 
   const list = await prisma.feedback.findMany({
     where,
-    include: {
+    select: {
+      id: true,
+      staffId: true,
+      managerId: true,
+      subject: true,
+      message: true,
+      period: true,
+      periodLabel: true,
+      kpiId: true,
+      readAt: true,
+      createdAt: true,
       staff: { select: { fullName: true } },
       manager: { select: { fullName: true } },
       kpi: { select: { name: true } },
@@ -46,7 +100,7 @@ export async function listAllFeedback(filter?: { staffId?: string }) {
     orderBy: { createdAt: 'desc' },
   });
 
-  return list.map((f: any) => ({
+  const result = list.map((f: any) => ({
     id: f.id,
     staffId: f.staffId,
     staffName: f.staff.fullName,
@@ -61,6 +115,9 @@ export async function listAllFeedback(filter?: { staffId?: string }) {
     readAt: f.readAt ? f.readAt.toISOString() : null,
     createdAt: f.createdAt.toISOString(),
   }));
+
+  feedbackCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  return result;
 }
 
 export async function createFeedback(managerId: string, input: any) {
@@ -95,7 +152,7 @@ export async function createFeedback(managerId: string, input: any) {
     details: `Provided performance feedback to ${staff.fullName} ("${created.subject}")`,
   });
 
-  return {
+  const dto = {
     id: created.id,
     staffId: created.staffId,
     staffName: created.staff.fullName,
@@ -110,6 +167,12 @@ export async function createFeedback(managerId: string, input: any) {
     readAt: null,
     createdAt: created.createdAt.toISOString(),
   };
+
+  realtimeService.sendToUser(input.staffId, 'feedback_created', dto);
+  realtimeService.notifyCountInvalidated([input.staffId]);
+  invalidateFeedbackCache(input.staffId);
+
+  return dto;
 }
 
 export async function markFeedbackRead(id: string, userId: string) {
@@ -131,6 +194,9 @@ export async function markFeedbackRead(id: string, userId: string) {
       kpi: { select: { name: true } },
     },
   });
+
+  realtimeService.notifyCountInvalidated([userId]);
+  invalidateFeedbackCache(userId);
 
   return {
     id: updated.id,

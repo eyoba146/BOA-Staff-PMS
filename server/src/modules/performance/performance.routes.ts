@@ -7,6 +7,7 @@ export const performanceRoutes = Router();
 // Staff own summary & trend
 performanceRoutes.get('/me', authenticate, performanceController.getMySummary);
 performanceRoutes.get('/me/trend', authenticate, performanceController.getMyTrend);
+performanceRoutes.get('/me/dashboard', authenticate, performanceController.getMyDashboard);
 
 // Branch overview (Manager only)
 performanceRoutes.get('/branch', authenticate, requireRole('manager'), performanceController.getBranchOverview);
@@ -17,3 +18,4 @@ performanceRoutes.get('/report', authenticate, requireRole('manager'), performan
 // Individual staff summary & trend
 performanceRoutes.get('/staff/:staffId', authenticate, performanceController.getStaffSummary);
 performanceRoutes.get('/staff/:staffId/trend', authenticate, performanceController.getStaffTrend);
+performanceRoutes.get('/staff/:staffId/dashboard', authenticate, performanceController.getStaffDashboard);

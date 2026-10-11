@@ -14,42 +14,82 @@ import {
   expectedSlots,
   type PerformanceStatus,
 } from '../../utils/calculations.js';
+import { getSettings } from '../settings/settings.service.js';
+import { env } from '../../config/env.js';
+import { logger } from '../../utils/logger.js';
+import { getRequestId } from '../../utils/request-context.js';
 
-export async function summarizeStaffRange(staffId: string, from: string, to: string) {
-  const staff = await prisma.user.findUnique({
-    where: { id: staffId },
-    select: { id: true, fullName: true, employeeId: true, positionTitle: true, status: true },
-  });
+function diagnostic(message: string, meta: Record<string, unknown> = {}) {
+  if (env.NODE_ENV !== 'development') return;
+  logger.debug(message, { requestId: getRequestId(), ...meta });
+}
 
-  if (!staff) {
-    throw ApiError.notFound('Staff member not found.');
+async function timedQuery<T>(label: string, query: () => Promise<T>): Promise<T> {
+  const startedAt = performance.now();
+  try {
+    const result = await query();
+    diagnostic('Performance database operation completed', {
+      operation: label,
+      durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+      rowCount: Array.isArray(result) ? result.length : undefined,
+    });
+    return result;
+  } catch (error) {
+    diagnostic('Performance database operation failed', {
+      operation: label,
+      durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+      error: error instanceof Error ? error.name : 'unknown',
+    });
+    throw error;
   }
+}
 
-  const settings = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
-  const onTargetMin = settings?.onTargetMin ?? 85;
-  const needsAttentionMin = settings?.needsAttentionMin ?? 70;
-  const weightingEnabled = settings?.weightingEnabled ?? true;
+function settingsConfig(settingsData: Awaited<ReturnType<typeof getSettings>>): PerformanceSettingsConfig {
+  return {
+    onTargetMin: settingsData.thresholds.onTargetMin,
+    needsAttentionMin: settingsData.thresholds.needsAttentionMin,
+    weightingEnabled: settingsData.weightingEnabled,
+    thresholdsStatus: settingsData.thresholds.status,
+  };
+}
 
-  const assignments = await prisma.kpiAssignment.findMany({
-    where: { staffId, kpi: { isActive: true } },
-    include: { kpi: true },
-  });
+export interface PerformanceSettingsConfig {
+  onTargetMin: number;
+  needsAttentionMin: number;
+  weightingEnabled: boolean;
+  thresholdsStatus?: string;
+}
 
-  const allEntries = await prisma.kpiEntry.findMany({
-    where: {
-      staffId,
-      date: { gte: from, lte: to },
-    },
-    include: { kpi: true },
-  });
+/**
+ * Pure, in-memory calculation of staff performance summary given preloaded assignments and entries.
+ * Eliminates all database round trips so large batches can be calculated in microseconds.
+ */
+export function computeStaffSummary(
+  staffId: string,
+  from: string,
+  to: string,
+  assignments: any[],
+  allEntries: any[],
+  settings: PerformanceSettingsConfig
+) {
+  const onTargetMin = settings.onTargetMin ?? 85;
+  const needsAttentionMin = settings.needsAttentionMin ?? 70;
+  const weightingEnabled = settings.weightingEnabled ?? true;
 
   let submitted = 0;
   let expected = 0;
 
+  const entriesByKpiId = new Map<string, any[]>();
+  for (const entry of allEntries) {
+    const list = entriesByKpiId.get(entry.kpiId) ?? [];
+    list.push(entry);
+    entriesByKpiId.set(entry.kpiId, list);
+  }
+
   const kpiResults = assignments.map((asgn: any) => {
     const kpi = asgn.kpi;
     const target = asgn.targetOverride ?? kpi.target;
-    const list = allEntries.filter((e: any) => e.kpiId === kpi.id);
+    const list = entriesByKpiId.get(kpi.id) ?? [];
     const slots = expectedSlots(kpi.frequency, from, to);
     expected += slots;
     submitted += Math.min(list.length, slots || list.length);
@@ -94,15 +134,19 @@ export async function summarizeStaffRange(staffId: string, from: string, to: str
     const useWeights = weightingEnabled && rated.every((r: any) => r.weight !== null && r.weight > 0);
     if (useWeights) {
       const totalW = rated.reduce((s: number, r: any) => s + (r.weight ?? 0), 0);
-      overall = totalW > 0 ? rated.reduce((s: number, r: any) => s + (r.performancePercent ?? 0) * (r.weight ?? 0), 0) / totalW : null;
+      overall =
+        totalW > 0
+          ? rated.reduce((s: number, r: any) => s + (r.performancePercent ?? 0) * (r.weight ?? 0), 0) /
+            totalW
+          : null;
     } else {
       overall = rated.reduce((s: number, r: any) => s + (r.performancePercent ?? 0), 0) / rated.length;
     }
   }
 
   const allApproved =
-    settings?.thresholdsStatus === 'approved' &&
-    assignments.every((a: any) => a.kpi.ruleStatus === 'approved');
+    settings.thresholdsStatus === 'approved' &&
+    assignments.every((a: any) => a.kpi?.ruleStatus === 'approved');
 
   return {
     staffId,
@@ -122,6 +166,41 @@ export async function summarizeStaffRange(staffId: string, from: string, to: str
   };
 }
 
+export async function summarizeStaffRange(staffId: string, from: string, to: string) {
+  const staff = await timedQuery('summary.staff', () => prisma.user.findUnique({
+    where: { id: staffId },
+    select: { id: true, fullName: true, employeeId: true, positionTitle: true, status: true },
+  }));
+
+  if (!staff) {
+    throw ApiError.notFound('Staff member not found.');
+  }
+
+  const [settingsData, assignments, allEntries] = await Promise.all([
+    timedQuery('summary.settings', () => getSettings()),
+    timedQuery<any[]>('summary.assignments', () => prisma.kpiAssignment.findMany({
+      where: { staffId, kpi: { isActive: true } },
+      include: { kpi: true },
+    })),
+    timedQuery<any[]>('summary.entries', () => prisma.kpiEntry.findMany({
+      where: {
+        staffId,
+        date: { gte: from, lte: to },
+      },
+      select: { staffId: true, kpiId: true, date: true, actual: true, target: true },
+    })),
+  ]);
+
+  const result = computeStaffSummary(staffId, from, to, assignments, allEntries, settingsConfig(settingsData));
+  diagnostic('Performance summary calculated', {
+    operation: 'summary',
+    assignments: assignments.length,
+    entries: allEntries.length,
+    kpiResults: result.kpiResults.length,
+  });
+  return result;
+}
+
 export async function summarizeStaffPeriod(staffId: string, period: PerformancePeriod, refDate: string) {
   const b = getPeriodBounds(period, refDate);
   const summary = await summarizeStaffRange(staffId, b.start, b.end);
@@ -134,33 +213,32 @@ export async function summarizeStaffPeriod(staffId: string, period: PerformanceP
 
 const TREND_POINTS: Record<PerformancePeriod, number> = { daily: 14, weekly: 10, monthly: 6, quarterly: 4 };
 
-export async function trendForStaff(
+export function computeTrendFromData(
   staffIds: string[],
   period: PerformancePeriod,
   refDate: string,
+  allAssignments: any[],
+  allEntries: any[],
+  weightingEnabled: boolean,
   points = TREND_POINTS[period] || 10
 ) {
   if (staffIds.length === 0) return [];
 
-  const earliestRef = shiftPeriod(period, refDate, -(points - 1));
-  const earliestBounds = getPeriodBounds(period, earliestRef);
-  const latestBounds = getPeriodBounds(period, refDate);
+  const assignmentsByStaff = new Map<string, any[]>();
+  for (const assignment of allAssignments) {
+    const list = assignmentsByStaff.get(assignment.staffId) ?? [];
+    list.push(assignment);
+    assignmentsByStaff.set(assignment.staffId, list);
+  }
 
-  const settings = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
-  const weightingEnabled = settings?.weightingEnabled ?? true;
-
-  const allAssignments = await prisma.kpiAssignment.findMany({
-    where: { staffId: { in: staffIds }, kpi: { isActive: true } },
-    include: { kpi: true },
-  });
-
-  const allEntries = await prisma.kpiEntry.findMany({
-    where: {
-      staffId: { in: staffIds },
-      date: { gte: earliestBounds.start, lte: latestBounds.end },
-    },
-    include: { kpi: true },
-  });
+  const entriesByStaff = new Map<string, Map<string, any[]>>();
+  for (const entry of allEntries) {
+    const byKpi = entriesByStaff.get(entry.staffId) ?? new Map<string, any[]>();
+    const list = byKpi.get(entry.kpiId) ?? [];
+    list.push(entry);
+    byKpi.set(entry.kpiId, list);
+    entriesByStaff.set(entry.staffId, byKpi);
+  }
 
   const out = [];
   for (let i = points - 1; i >= 0; i--) {
@@ -170,13 +248,15 @@ export async function trendForStaff(
 
     const values: number[] = [];
     for (const id of staffIds) {
-      const assignments = allAssignments.filter((a: any) => a.staffId === id);
-      const entries = allEntries.filter((e: any) => e.staffId === id && e.date >= b.start && e.date <= b.end);
+      const assignments = assignmentsByStaff.get(id) ?? [];
+      const entriesByKpi = entriesByStaff.get(id) ?? new Map<string, any[]>();
 
       const kpiResults = assignments.map((asgn: any) => {
         const kpi = asgn.kpi;
         const target = asgn.targetOverride ?? kpi.target;
-        const list = entries.filter((e: any) => e.kpiId === kpi.id);
+        const list = (entriesByKpi.get(kpi.id) ?? []).filter(
+          (e: any) => e.date >= b.start && e.date <= b.end
+        );
         if (list.length === 0) return { percent: null, weight: kpi.weight };
 
         const isPct = kpi.valueType === 'percentage';
@@ -194,7 +274,10 @@ export async function trendForStaff(
         let overall: number | null = null;
         if (useWeights) {
           const totalW = rated.reduce((s: number, r: any) => s + (r.weight ?? 0), 0);
-          overall = totalW > 0 ? rated.reduce((s: number, r: any) => s + (r.percent ?? 0) * (r.weight ?? 0), 0) / totalW : null;
+          overall =
+            totalW > 0
+              ? rated.reduce((s: number, r: any) => s + (r.percent ?? 0) * (r.weight ?? 0), 0) / totalW
+              : null;
         } else {
           overall = rated.reduce((s: number, r: any) => s + (r.percent ?? 0), 0) / rated.length;
         }
@@ -221,16 +304,226 @@ export async function trendForStaff(
   return out;
 }
 
+export async function trendForStaff(
+  staffIds: string[],
+  period: PerformancePeriod,
+  refDate: string,
+  points = TREND_POINTS[period] || 10
+) {
+  if (staffIds.length === 0) return [];
+
+  const earliestRef = shiftPeriod(period, refDate, -(points - 1));
+  const earliestBounds = getPeriodBounds(period, earliestRef);
+  const latestBounds = getPeriodBounds(period, refDate);
+
+  const [settingsData, allAssignments, allEntries] = await Promise.all([
+    timedQuery('trend.settings', () => getSettings()),
+    timedQuery<any[]>('trend.assignments', () => prisma.kpiAssignment.findMany({
+      where: { staffId: { in: staffIds }, kpi: { isActive: true } },
+      include: { kpi: true },
+    })),
+    timedQuery<any[]>('trend.entries', () => prisma.kpiEntry.findMany({
+      where: {
+        staffId: { in: staffIds },
+        date: { gte: earliestBounds.start, lte: latestBounds.end },
+      },
+      select: { staffId: true, kpiId: true, date: true, actual: true, target: true },
+    })),
+  ]);
+
+  const result = computeTrendFromData(
+    staffIds,
+    period,
+    refDate,
+    allAssignments,
+    allEntries,
+    settingsData.weightingEnabled,
+    points
+  );
+  diagnostic('Performance trend calculated', {
+    operation: 'trend',
+    staffCount: staffIds.length,
+    assignments: allAssignments.length,
+    entries: allEntries.length,
+    points: result.length,
+  });
+  return result;
+}
+
+/**
+ * Loads the common performance inputs once for dashboard views that need both
+ * the current-period summary and historical trend.
+ */
+export async function dashboardForStaff(staffId: string, period: PerformancePeriod, refDate: string) {
+  const startedAt = performance.now();
+  const bounds = getPeriodBounds(period, refDate);
+  const points = TREND_POINTS[period] || 10;
+  const earliestRef = shiftPeriod(period, refDate, -(points - 1));
+  const earliestBounds = getPeriodBounds(period, earliestRef);
+
+  const [staff, settingsData, assignments, allEntries] = await Promise.all([
+    timedQuery('dashboard.staff', () => prisma.user.findUnique({
+      where: { id: staffId },
+      select: { id: true },
+    })),
+    timedQuery('dashboard.settings', () => getSettings()),
+    timedQuery<any[]>('dashboard.assignments', () => prisma.kpiAssignment.findMany({
+      where: { staffId, kpi: { isActive: true } },
+      include: { kpi: true },
+    })),
+    timedQuery<any[]>('dashboard.entries', () => prisma.kpiEntry.findMany({
+      where: {
+        staffId,
+        date: { gte: earliestBounds.start, lte: bounds.end },
+      },
+      select: { staffId: true, kpiId: true, date: true, actual: true, target: true },
+    })),
+  ]);
+  if (!staff) throw ApiError.notFound('Staff member not found.');
+
+  const config = settingsConfig(settingsData);
+  const periodEntries = allEntries.filter((entry: any) => entry.date >= bounds.start && entry.date <= bounds.end);
+  const summary = {
+    ...computeStaffSummary(staffId, bounds.start, bounds.end, assignments, periodEntries, config),
+    period,
+    periodLabel: bounds.label,
+  };
+  const trend = computeTrendFromData(
+    [staffId],
+    period,
+    refDate,
+    assignments,
+    allEntries,
+    settingsData.weightingEnabled,
+    points
+  );
+
+  diagnostic('Performance dashboard calculated', {
+    operation: 'dashboard',
+    durationMs: Math.round((performance.now() - startedAt) * 100) / 100,
+    assignments: assignments.length,
+    entries: allEntries.length,
+    points: trend.length,
+  });
+  return { summary, trend };
+}
+
+interface CachedOverview {
+  data: any;
+  timestamp: number;
+}
+const overviewCache = new Map<string, CachedOverview>();
+const OVERVIEW_CACHE_TTL = 30000; // 30s cache
+
+export function invalidateOverviewCache() {
+  overviewCache.clear();
+  reportCache.clear();
+}
+
 export async function getBranchOverview(period: PerformancePeriod, refDate: string) {
+  const cacheKey = `${period}_${refDate}`;
+  const cached = overviewCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < OVERVIEW_CACHE_TTL) {
+    return cached.data;
+  }
+
+  const b = getPeriodBounds(period, refDate);
+  const today = todayISO();
+  const checkDaily = !isSunday(today);
+  const points = TREND_POINTS[period] || 10;
+  const earliestRef = shiftPeriod(period, refDate, -(points - 1));
+  const earliestBounds = getPeriodBounds(period, earliestRef);
+
   const staff = await prisma.user.findMany({
     where: { role: 'staff', status: 'active' },
     select: { id: true, fullName: true, employeeId: true, positionTitle: true },
   });
 
-  const b = getPeriodBounds(period, refDate);
+  const staffIds = staff.map((s: { id: string }) => s.id);
+
+  // Fetch pending users, settings, KPIs, assignments, and historical entries in a single parallel batch
+  const [pendingUsers, settingsData, activeKpis, allAssignments, allHistoricalEntries, todayEntries] =
+    await Promise.all([
+      prisma.user.findMany({
+        where: { role: 'staff', status: 'pending_approval' },
+        select: { id: true, fullName: true },
+      }),
+      getSettings(),
+      prisma.kpi.findMany({ where: { isActive: true } }),
+      staffIds.length > 0
+        ? prisma.kpiAssignment.findMany({
+            where: { staffId: { in: staffIds }, kpi: { isActive: true } },
+            include: { kpi: true },
+          })
+        : Promise.resolve([]),
+      staffIds.length > 0
+        ? prisma.kpiEntry.findMany({
+            where: { staffId: { in: staffIds }, date: { gte: earliestBounds.start, lte: b.end } },
+            select: { staffId: true, kpiId: true, date: true, actual: true, target: true },
+          })
+        : Promise.resolve([]),
+      staffIds.length > 0 && checkDaily
+        ? prisma.kpiEntry.findMany({
+            where: { staffId: { in: staffIds }, date: today },
+            select: { staffId: true, kpiId: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+  // Compute trend directly in-memory from preloaded historical entries
+  const trend = computeTrendFromData(
+    staffIds,
+    period,
+    refDate,
+    allAssignments,
+    allHistoricalEntries,
+    settingsData.weightingEnabled,
+    points
+  );
+
+  // Filter current period entries in memory
+  const periodEntries = allHistoricalEntries.filter(
+    (e: any) => e.date >= b.start && e.date <= b.end
+  );
+
+  // Index assignments and entries by staffId in memory
+  const assignmentsByStaff = new Map<string, any[]>();
+  for (const asgn of allAssignments) {
+    const list = assignmentsByStaff.get(asgn.staffId) ?? [];
+    list.push(asgn);
+    assignmentsByStaff.set(asgn.staffId, list);
+  }
+
+  const entriesByStaff = new Map<string, any[]>();
+  for (const entry of periodEntries) {
+    const list = entriesByStaff.get(entry.staffId) ?? [];
+    list.push(entry);
+    entriesByStaff.set(entry.staffId, list);
+  }
+
+  const todayEntriesByStaff = new Map<string, number>();
+  for (const entry of todayEntries) {
+    todayEntriesByStaff.set(entry.staffId, (todayEntriesByStaff.get(entry.staffId) ?? 0) + 1);
+  }
+
+  const settingsConfig: PerformanceSettingsConfig = {
+    onTargetMin: settingsData.thresholds.onTargetMin,
+    needsAttentionMin: settingsData.thresholds.needsAttentionMin,
+    weightingEnabled: settingsData.weightingEnabled,
+    thresholdsStatus: settingsData.thresholds.status,
+  };
+
+  // Compute staff summaries in memory
   const rows: any[] = [];
+  let expectedEntriesToday = 0;
+  let entriesToday = 0;
+  const attentionItems: any[] = [];
+
   for (const u of staff) {
-    const s = await summarizeStaffRange(u.id, b.start, b.end);
+    const staffAssignments = assignmentsByStaff.get(u.id) ?? [];
+    const staffEntries = entriesByStaff.get(u.id) ?? [];
+    const s = computeStaffSummary(u.id, b.start, b.end, staffAssignments, staffEntries, settingsConfig);
+
     rows.push({
       staffId: u.id,
       fullName: u.fullName,
@@ -241,10 +534,30 @@ export async function getBranchOverview(period: PerformancePeriod, refDate: stri
       entriesSubmitted: s.entriesSubmitted,
       entriesExpected: s.entriesExpected,
     });
+
+    if (checkDaily) {
+      const dailyAssignments = staffAssignments.filter((a) => a.kpi.frequency === 'daily');
+      const recordedToday = todayEntriesByStaff.get(u.id) ?? 0;
+
+      expectedEntriesToday += dailyAssignments.length;
+      entriesToday += recordedToday;
+
+      if (dailyAssignments.length > 0 && recordedToday < dailyAssignments.length) {
+        attentionItems.push({
+          id: `ns_${u.id}`,
+          kind: 'not_submitted',
+          title: u.fullName,
+          detail: `${dailyAssignments.length - recordedToday} of ${dailyAssignments.length} daily entries not yet submitted today`,
+          staffId: u.id,
+        });
+      }
+    }
   }
 
   const rated = rows.filter((r) => r.overallPercent !== null);
-  const averagePercent = rated.length ? rated.reduce((s, r) => s + (r.overallPercent ?? 0), 0) / rated.length : null;
+  const averagePercent = rated.length
+    ? rated.reduce((s, r) => s + (r.overallPercent ?? 0), 0) / rated.length
+    : null;
 
   const statusBreakdown: Record<PerformanceStatus, number> = {
     on_target: 0,
@@ -257,35 +570,6 @@ export async function getBranchOverview(period: PerformancePeriod, refDate: stri
     statusBreakdown[r.status as PerformanceStatus]++;
   });
 
-  const today = todayISO();
-  let expectedEntriesToday = 0;
-  let entriesToday = 0;
-  const attentionItems: any[] = [];
-
-  if (!isSunday(today)) {
-    for (const u of staff) {
-      const dailyAssignments = await prisma.kpiAssignment.findMany({
-        where: { staffId: u.id, kpi: { isActive: true, frequency: 'daily' } },
-      });
-      const entriesRecorded = await prisma.kpiEntry.count({
-        where: { staffId: u.id, date: today },
-      });
-
-      expectedEntriesToday += dailyAssignments.length;
-      entriesToday += entriesRecorded;
-
-      if (dailyAssignments.length > 0 && entriesRecorded < dailyAssignments.length) {
-        attentionItems.push({
-          id: `ns_${u.id}`,
-          kind: 'not_submitted',
-          title: u.fullName,
-          detail: `${dailyAssignments.length - entriesRecorded} of ${dailyAssignments.length} daily entries not yet submitted today`,
-          staffId: u.id,
-        });
-      }
-    }
-  }
-
   for (const r of rows.filter((x) => x.status === 'below_target')) {
     attentionItems.push({
       id: `bt_${r.staffId}`,
@@ -296,9 +580,6 @@ export async function getBranchOverview(period: PerformancePeriod, refDate: stri
     });
   }
 
-  const pendingUsers = await prisma.user.findMany({
-    where: { role: 'staff', status: 'pending_approval' },
-  });
   for (const p of pendingUsers) {
     attentionItems.push({
       id: `pa_${p.id}`,
@@ -309,15 +590,11 @@ export async function getBranchOverview(period: PerformancePeriod, refDate: stri
     });
   }
 
-  const trend = await trendForStaff(staff.map((s: any) => s.id), period, refDate);
-
-  const activeKpis = await prisma.kpi.findMany({ where: { isActive: true } });
-  const settings = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
   const allApproved =
-    settings?.thresholdsStatus === 'approved' &&
+    settingsData.thresholds.status === 'approved' &&
     activeKpis.every((k: any) => k.ruleStatus === 'approved');
 
-  return {
+  const result = {
     period,
     periodLabel: b.label,
     activeStaff: staff.length,
@@ -331,6 +608,20 @@ export async function getBranchOverview(period: PerformancePeriod, refDate: stri
     attentionItems,
     calculationBasis: allApproved ? ('approved' as const) : ('pending_validation' as const),
   };
+
+  overviewCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  return result;
+}
+
+interface CachedReport {
+  data: any;
+  timestamp: number;
+}
+const reportCache = new Map<string, CachedReport>();
+const REPORT_CACHE_TTL = 30000;
+
+export function invalidateReportCache() {
+  reportCache.clear();
 }
 
 export async function getPerformanceReport(period: PerformancePeriod, from: string, to: string) {
@@ -338,16 +629,69 @@ export async function getPerformanceReport(period: PerformancePeriod, from: stri
     throw ApiError.badRequest('The start date must be before or equal to the end date.');
   }
 
+  const cacheKey = `${period}_${from}_${to}`;
+  const cached = reportCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < REPORT_CACHE_TTL) {
+    return cached.data;
+  }
+
   const staff = await prisma.user.findMany({
     where: { role: 'staff', status: 'active' },
     select: { id: true, fullName: true, employeeId: true, positionTitle: true },
   });
 
+  const [activeKpis, settingsData] = await Promise.all([
+    prisma.kpi.findMany({ where: { isActive: true } }),
+    getSettings(),
+  ]);
+
+  const staffIds = staff.map((s: { id: string }) => s.id);
+
+  const [allAssignments, periodEntries] = await Promise.all([
+    staffIds.length > 0
+      ? prisma.kpiAssignment.findMany({
+          where: { staffId: { in: staffIds }, kpi: { isActive: true } },
+          include: { kpi: true },
+        })
+      : Promise.resolve([]),
+    staffIds.length > 0
+      ? prisma.kpiEntry.findMany({
+          where: { staffId: { in: staffIds }, date: { gte: from, lte: to } },
+          select: { staffId: true, kpiId: true, date: true, actual: true, target: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  // Index assignments and entries by staffId in memory
+  const assignmentsByStaff = new Map<string, any[]>();
+  for (const asgn of allAssignments) {
+    const list = assignmentsByStaff.get(asgn.staffId) ?? [];
+    list.push(asgn);
+    assignmentsByStaff.set(asgn.staffId, list);
+  }
+
+  const entriesByStaff = new Map<string, any[]>();
+  for (const entry of periodEntries) {
+    const list = entriesByStaff.get(entry.staffId) ?? [];
+    list.push(entry);
+    entriesByStaff.set(entry.staffId, list);
+  }
+
+  const settingsConfig: PerformanceSettingsConfig = {
+    onTargetMin: settingsData.thresholds.onTargetMin,
+    needsAttentionMin: settingsData.thresholds.needsAttentionMin,
+    weightingEnabled: settingsData.weightingEnabled,
+    thresholdsStatus: settingsData.thresholds.status,
+  };
+
   const byStaff: any[] = [];
   const summaries: any[] = [];
 
   for (const u of staff) {
-    const s = await summarizeStaffRange(u.id, from, to);
+    const staffAssignments = assignmentsByStaff.get(u.id) ?? [];
+    const staffEntries = entriesByStaff.get(u.id) ?? [];
+    const s = computeStaffSummary(u.id, from, to, staffAssignments, staffEntries, settingsConfig);
+
     summaries.push(s);
     byStaff.push({
       staffId: u.id,
@@ -361,24 +705,21 @@ export async function getPerformanceReport(period: PerformancePeriod, from: stri
     });
   }
 
-  const activeKpis = await prisma.kpi.findMany({ where: { isActive: true } });
-  const settings = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
-  const onTargetMin = settings?.onTargetMin ?? 85;
-  const needsAttentionMin = settings?.needsAttentionMin ?? 70;
+  // Aggregate KPI metrics in memory without additional database queries
+  const onTargetMin = settingsData.thresholds.onTargetMin ?? 85;
+  const needsAttentionMin = settingsData.thresholds.needsAttentionMin ?? 70;
+
+  const entriesByKpiId = new Map<string, number>();
+  for (const entry of periodEntries) {
+    entriesByKpiId.set(entry.kpiId, (entriesByKpiId.get(entry.kpiId) ?? 0) + 1);
+  }
 
   const byKpi = [];
   for (const k of activeKpis) {
     const results = summaries.flatMap((s) => s.kpiResults.filter((r: any) => r.kpiId === k.id));
     const rated = results.filter((r: any) => r.performancePercent !== null);
     const avg = rated.length ? rated.reduce((s: number, r: any) => s + (r.performancePercent ?? 0), 0) / rated.length : null;
-
-    const entriesCount = await prisma.kpiEntry.count({
-      where: {
-        kpiId: k.id,
-        date: { gte: from, lte: to },
-        staff: { status: 'active' },
-      },
-    });
+    const entriesCount = entriesByKpiId.get(k.id) ?? 0;
 
     byKpi.push({
       kpiId: k.id,
@@ -393,10 +734,10 @@ export async function getPerformanceReport(period: PerformancePeriod, from: stri
   }
 
   const allApproved =
-    settings?.thresholdsStatus === 'approved' &&
+    settingsData.thresholds.status === 'approved' &&
     activeKpis.every((k: any) => k.ruleStatus === 'approved');
 
-  return {
+  const result = {
     period,
     from,
     to,
@@ -405,4 +746,7 @@ export async function getPerformanceReport(period: PerformancePeriod, from: stri
     byKpi,
     calculationBasis: allApproved ? ('approved' as const) : ('pending_validation' as const),
   };
+
+  reportCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  return result;
 }

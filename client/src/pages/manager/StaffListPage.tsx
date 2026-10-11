@@ -1,16 +1,22 @@
-import { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useCallback, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Users,
   UserCheck,
   Search,
-  CheckCircle,
+  CheckCircle2,
   Calendar,
   Briefcase,
-  Building,
+  Building2,
   Phone,
   Mail,
   ArrowRight,
+  ShieldCheck,
+  Copy,
+  Check,
+  Lock,
+  XCircle,
+  FileBadge,
 } from 'lucide-react';
 import { staffService } from '@/services/staff.service';
 import { useAsync } from '@/hooks/useAsync';
@@ -18,7 +24,6 @@ import { useToast } from '@/context/ToastContext';
 import { PageHeader, AsyncBoundary } from '@/components/shared';
 import {
   Card,
-  CardBody,
   Button,
   Input,
   Select,
@@ -38,14 +43,32 @@ import {
 import type { User } from '@/types';
 import { paths } from '@/routes/paths';
 import { formatDate } from '@/utils/date';
-import { employeeId } from '@/utils/validation';
 import { toApiError } from '@/services/http/apiClient';
 
 export function StaffListPage() {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'pending' ? 'pending' : 'all';
+  const [activeTab, setActiveTab] = useState<'all' | 'pending'>(initialTab);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [pendingSearch, setPendingSearch] = useState('');
+  const [copiedRef, setCopiedRef] = useState<string | null>(null);
+
+  // Sync tab with URL search parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'pending' && activeTab !== 'pending') {
+      setActiveTab('pending');
+    } else if (tabParam === 'all' && activeTab !== 'all') {
+      setActiveTab('all');
+    }
+  }, [searchParams, activeTab]);
+
+  const handleTabChange = (tab: 'all' | 'pending') => {
+    setActiveTab(tab);
+    setSearchParams(tab === 'pending' ? { tab: 'pending' } : {});
+  };
 
   // Approval / rejection state
   const [approveUser, setApproveUser] = useState<User | null>(null);
@@ -68,33 +91,33 @@ export function StaffListPage() {
 
   const state = useAsync(loadData, [loadData]);
 
-  const openApprove = (staff: User) => {
+  const openApprove = async (staff: User) => {
     setApproveUser(staff);
-    setAssignedEmpId(staff.employeeId || '');
     setApproveError('');
+    if (staff.employeeId) {
+      setAssignedEmpId(staff.employeeId);
+    } else {
+      try {
+        const next = await staffService.getNextEmployeeId();
+        setAssignedEmpId(next.employeeId);
+      } catch {
+        setAssignedEmpId('BOA-S001');
+      }
+    }
   };
 
   const handleApprove = async () => {
     if (!approveUser) return;
     const cleanId = assignedEmpId.trim().toUpperCase();
-    if (!cleanId) {
-      setApproveError('Official Employee ID is required to approve this account.');
-      return;
-    }
-    const formatErr = employeeId(cleanId);
-    if (formatErr) {
-      setApproveError(formatErr);
-      return;
-    }
 
     setApproving(true);
     setApproveError('');
     try {
-      await staffService.approve(approveUser.id, { employeeId: cleanId });
+      await staffService.approve(approveUser.id, cleanId ? { employeeId: cleanId } : {});
       showToast({
         tone: 'success',
         title: 'Staff member approved',
-        message: `${approveUser.fullName}'s account is now active with Employee ID ${cleanId}.`,
+        message: `${approveUser.fullName}'s account is now active with Employee ID ${cleanId || 'auto-assigned'}.`,
       });
       setApproveUser(null);
       setAssignedEmpId('');
@@ -134,11 +157,17 @@ export function StaffListPage() {
     }
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedRef(text);
+    setTimeout(() => setCopiedRef(null), 2000);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Branch Staff Management"
-        description="View enrolled branch employees, approve pending registrations, and inspect individual performance profiles."
+        description="View enrolled branch employees, clear pending applicant registrations, and inspect performance profiles."
         documentTitle="Staff Management"
       />
 
@@ -153,36 +182,54 @@ export function StaffListPage() {
             return matchesSearch && matchesStatus;
           });
 
+          const filteredPending = pendingStaff.filter((s) => {
+            const q = pendingSearch.toLowerCase();
+            return (
+              s.fullName.toLowerCase().includes(q) ||
+              s.email.toLowerCase().includes(q) ||
+              s.position.toLowerCase().includes(q) ||
+              (s.referenceId && s.referenceId.toLowerCase().includes(q))
+            );
+          });
+
           return (
             <div className="space-y-6">
               {/* Navigation Tabs */}
-              <div className="flex border-b border-zinc-200">
+              <div className="flex items-center gap-1 border-b border-zinc-200">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('all')}
-                  className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  onClick={() => handleTabChange('all')}
+                  className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
                     activeTab === 'all'
-                      ? 'border-ink-900 text-ink-900'
-                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
+                      ? 'border-ink-900 text-ink-950 font-bold'
+                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'
                   }`}
                 >
                   <Users className="size-4" />
-                  All Staff ({allStaff.length})
+                  <span>All Staff</span>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600">
+                    {allStaff.length}
+                  </span>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => setActiveTab('pending')}
-                  className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  onClick={() => handleTabChange('pending')}
+                  className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
                     activeTab === 'pending'
-                      ? 'border-ink-900 text-ink-900'
-                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
+                      ? 'border-gold-500 text-ink-950 font-bold'
+                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'
                   }`}
                 >
-                  <UserCheck className="size-4" />
-                  Pending Approvals
-                  {pendingStaff.length > 0 && (
-                    <span className="inline-flex items-center justify-center rounded-full bg-gold-400 px-2 py-0.5 text-xs font-bold text-ink-950">
+                  <UserCheck className="size-4 text-gold-600" />
+                  <span>Pending Approvals</span>
+                  {pendingStaff.length > 0 ? (
+                    <span className="inline-flex items-center justify-center rounded-full bg-gold-400 px-2.5 py-0.5 text-xs font-black text-ink-950 shadow-sm animate-pulse">
                       {pendingStaff.length}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
+                      0
                     </span>
                   )}
                 </button>
@@ -270,80 +317,177 @@ export function StaffListPage() {
                   </Card>
                 </div>
               ) : (
-                /* Pending Approvals Tab */
-                <div className="space-y-4">
+                /* 10x Pending Approvals Tab */
+                <div className="space-y-6">
+                  {/* Executive Clearance Header */}
+                  <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-white p-5 shadow-sm">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-start gap-3.5">
+                        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gold-500 text-ink-950 shadow-md">
+                          <ShieldCheck className="size-6 stroke-[2.2]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-base font-bold text-ink-950">
+                              Staff Credential Clearance Queue
+                            </h3>
+                            <span className="rounded-full bg-gold-400/30 border border-gold-500/40 px-2.5 py-0.5 text-xs font-extrabold text-gold-900">
+                              {pendingStaff.length} Awaiting Authorization
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-600 max-w-2xl leading-relaxed">
+                            Candidates listed below have completed two-factor email verification. Upon your authorization,
+                            the system automatically provisions their official sequential Employee ID, activates core branch
+                            permissions, and dispatches credential details via Brevo.
+                          </p>
+                        </div>
+                      </div>
+
+                      {pendingStaff.length > 1 && (
+                        <div className="w-full sm:w-64">
+                          <Input
+                            placeholder="Filter pending candidates..."
+                            leftIcon={<Search className="size-4 text-zinc-400" />}
+                            value={pendingSearch}
+                            onChange={(e) => setPendingSearch(e.target.value)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {pendingStaff.length === 0 ? (
                     <EmptyState
-                      icon={CheckCircle}
-                      title="No pending registrations"
-                      description="All branch staff registration requests have been reviewed and processed."
+                      icon={CheckCircle2}
+                      title="All Registrations Cleared"
+                      description="There are currently no staff registrations awaiting manager approval. New candidate registrations will appear here in real time as soon as they complete email verification."
                     />
+                  ) : filteredPending.length === 0 ? (
+                    <p className="p-8 text-center text-xs text-zinc-500">
+                      No pending applicants match "{pendingSearch}".
+                    </p>
                   ) : (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {pendingStaff.map((staff) => (
-                        <Card key={staff.id} className="border-gold-300 ring-1 ring-gold-200/50">
-                          <CardBody className="space-y-4">
+                    /* 10x Clearance Cards Grid */
+                    <div className="grid gap-5 md:grid-cols-2">
+                      {filteredPending.map((staff) => (
+                        <div
+                          key={staff.id}
+                          className="group relative flex flex-col justify-between rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-gold-400 hover:shadow-lg"
+                        >
+                          <div className="space-y-4">
+                            {/* Card Top Header */}
                             <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-3">
-                                <Avatar name={staff.fullName} src={staff.avatarUrl} size="md" />
+                              <div className="flex items-center gap-3.5">
+                                <div className="relative">
+                                  <Avatar name={staff.fullName} src={staff.avatarUrl} size="md" />
+                                  <span
+                                    className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-white"
+                                    title="Email Verified via Brevo OTP"
+                                  >
+                                    <Check className="size-2.5 stroke-[3]" />
+                                  </span>
+                                </div>
                                 <div>
-                                  <h4 className="text-sm font-semibold text-zinc-900">{staff.fullName}</h4>
-                                  <p className="text-xs text-zinc-500">
-                                    {staff.employeeId ? (
-                                      <span>ID: {staff.employeeId}</span>
-                                    ) : (
-                                      <span className="italic text-amber-700 font-medium">ID pending assignment</span>
-                                    )}{' '}
-                                    · <span className="font-mono">{staff.referenceId}</span>
-                                  </p>
+                                  <h4 className="text-base font-bold text-ink-950 group-hover:text-gold-900 transition-colors">
+                                    {staff.fullName}
+                                  </h4>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => copyToClipboard(staff.referenceId || '')}
+                                      className="inline-flex items-center gap-1 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-mono font-medium text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 transition-colors"
+                                      title="Click to copy registration reference"
+                                    >
+                                      <span>Ref: {staff.referenceId || 'N/A'}</span>
+                                      {copiedRef === staff.referenceId ? (
+                                        <Check className="size-3 text-emerald-600" />
+                                      ) : (
+                                        <Copy className="size-3 text-zinc-400" />
+                                      )}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                              <AccountStatusBadge status={staff.status} />
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-2 rounded-md bg-zinc-50 p-3 text-xs text-zinc-600">
-                              <div className="flex items-center gap-1.5">
-                                <Briefcase className="size-3.5 text-zinc-400" />
-                                <span className="font-medium text-zinc-800">{staff.position}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Building className="size-3.5 text-zinc-400" />
-                                <span>{staff.branchName}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Mail className="size-3.5 text-zinc-400" />
-                                <span className="truncate">{staff.email}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <Phone className="size-3.5 text-zinc-400" />
-                                <span>{staff.phone}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between border-t border-zinc-100 pt-3 text-xs text-zinc-500">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="size-3.5 text-zinc-400" />
-                                Submitted: {formatDate(staff.createdAt)}
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100/80 px-2.5 py-1 text-[11.5px] font-bold text-amber-900 border border-amber-300/60">
+                                <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+                                Pending Clearance
                               </span>
+                            </div>
+
+                            {/* Dossier Matrix */}
+                            <div className="grid grid-cols-2 gap-2.5 rounded-xl border border-zinc-100 bg-zinc-50/80 p-3.5 text-xs text-zinc-700">
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  onClick={() => setRejectUser(staff)}
-                                >
-                                  Reject
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() => openApprove(staff)}
-                                >
-                                  Approve
-                                </Button>
+                                <Briefcase className="size-3.5 text-zinc-400 shrink-0" />
+                                <div className="truncate">
+                                  <span className="block text-[10px] uppercase font-bold text-zinc-400">Target Role</span>
+                                  <span className="font-semibold text-ink-950 truncate">{staff.position}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="size-3.5 text-zinc-400 shrink-0" />
+                                <div className="truncate">
+                                  <span className="block text-[10px] uppercase font-bold text-zinc-400">Branch</span>
+                                  <span className="font-semibold text-ink-950 truncate">{staff.branchName}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Mail className="size-3.5 text-zinc-400 shrink-0" />
+                                <div className="truncate">
+                                  <span className="block text-[10px] uppercase font-bold text-zinc-400">Verified Email</span>
+                                  <span className="font-semibold text-ink-950 truncate" title={staff.email}>{staff.email}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Phone className="size-3.5 text-zinc-400 shrink-0" />
+                                <div className="truncate">
+                                  <span className="block text-[10px] uppercase font-bold text-zinc-400">Phone</span>
+                                  <span className="font-semibold text-ink-950 truncate">{staff.phone}</span>
+                                </div>
                               </div>
                             </div>
-                          </CardBody>
-                        </Card>
+
+                            {/* Auto ID Provisioning Notice Pill */}
+                            <div className="flex items-center justify-between rounded-lg border border-amber-200/70 bg-amber-50/60 px-3 py-2 text-[11.5px] text-amber-900">
+                              <div className="flex items-center gap-1.5 font-medium">
+                                <Lock className="size-3.5 text-gold-700" />
+                                <span>Official Employee ID:</span>
+                              </div>
+                              <span className="font-mono font-bold text-gold-800 bg-white px-2 py-0.5 rounded border border-amber-200 shadow-2xs">
+                                System Sequential Assignment
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Footer with Actions */}
+                          <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-3.5 text-xs text-zinc-500">
+                            <span className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                              <Calendar className="size-3.5" />
+                              Registered: {formatDate(staff.createdAt)}
+                            </span>
+
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                leftIcon={<XCircle className="size-3.5 text-red-500" />}
+                                onClick={() => setRejectUser(staff)}
+                                className="text-zinc-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
+                              >
+                                Decline
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                leftIcon={<CheckCircle2 className="size-3.5" />}
+                                onClick={() => openApprove(staff)}
+                                className="font-bold shadow-xs"
+                              >
+                                Review & Approve
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -354,7 +498,7 @@ export function StaffListPage() {
         }}
       </AsyncBoundary>
 
-      {/* Approval & Employee ID Assignment Dialog */}
+      {/* 10x Official Approval Clearance Modal Dialog */}
       <Dialog
         open={Boolean(approveUser)}
         onClose={() => {
@@ -362,8 +506,8 @@ export function StaffListPage() {
           setAssignedEmpId('');
           setApproveError('');
         }}
-        title="Approve Staff Registration"
-        description="Review applicant details and assign an official Employee ID to activate the account."
+        title="Official Staff Clearance & Credential Provisioning"
+        description="Verify candidate eligibility and authorize Employee ID issuance."
         size="md"
         busy={approving}
         footer={
@@ -379,70 +523,112 @@ export function StaffListPage() {
             >
               Cancel
             </Button>
-            <Button variant="primary" onClick={handleApprove} loading={approving}>
-              Approve & Activate Account
+            <Button
+              variant="primary"
+              onClick={handleApprove}
+              loading={approving}
+              leftIcon={<ShieldCheck className="size-4 text-ink-950" />}
+              className="font-bold text-sm"
+            >
+              Confirm Approval & Issue ID
             </Button>
           </>
         }
       >
         {approveUser && (
-          <div className="space-y-4 py-2">
-            {/* Candidate Review Summary */}
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 space-y-3">
+          <div className="space-y-4 py-1">
+            {/* Candidate Dossier Overview Card */}
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/90 p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Avatar name={approveUser.fullName} src={approveUser.avatarUrl} size="md" />
                   <div>
-                    <h4 className="text-sm font-semibold text-zinc-900">{approveUser.fullName}</h4>
+                    <h4 className="text-sm font-bold text-ink-950">{approveUser.fullName}</h4>
                     <p className="text-xs text-zinc-500 font-mono">Ref: {approveUser.referenceId || 'N/A'}</p>
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                  <CheckCircle className="size-3 stroke-[2.5]" />
-                  Email Verified
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800 border border-emerald-300/60">
+                  <Check className="size-3 stroke-[3]" />
+                  Brevo OTP Verified
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs text-zinc-600 border-t border-zinc-200/60 pt-2.5">
+              <div className="grid grid-cols-2 gap-2.5 text-xs border-t border-zinc-200/70 pt-3">
                 <div>
-                  <span className="text-zinc-400">Position:</span>{' '}
+                  <span className="text-zinc-400 block text-[10.5px] uppercase font-bold">Assigned Position</span>
                   <span className="font-semibold text-zinc-900">{approveUser.position}</span>
                 </div>
                 <div>
-                  <span className="text-zinc-400">Branch:</span>{' '}
+                  <span className="text-zinc-400 block text-[10.5px] uppercase font-bold">Assigned Branch</span>
                   <span className="font-semibold text-zinc-900">{approveUser.branchName}</span>
                 </div>
                 <div className="truncate">
-                  <span className="text-zinc-400">Email:</span> {approveUser.email}
+                  <span className="text-zinc-400 block text-[10.5px] uppercase font-bold">Official Email</span>
+                  <span className="font-semibold text-zinc-900 truncate" title={approveUser.email}>{approveUser.email}</span>
                 </div>
                 <div>
-                  <span className="text-zinc-400">Phone:</span> {approveUser.phone}
+                  <span className="text-zinc-400 block text-[10.5px] uppercase font-bold">Contact Phone</span>
+                  <span className="font-semibold text-zinc-900">{approveUser.phone}</span>
                 </div>
               </div>
             </div>
 
-            {/* Manager-controlled Employee ID field */}
-            <Field
-              label="Official Employee ID"
-              error={approveError}
-              required
-              hint="Enter the official bank employee identifier (e.g. BOA-S012). This will be used by the employee to log in."
-            >
-              <Input
-                value={assignedEmpId}
-                onChange={(e) => {
-                  setAssignedEmpId(e.target.value);
-                  setApproveError('');
-                }}
-                placeholder="e.g. BOA-S012"
-                autoFocus
-              />
-            </Field>
+            {/* Official Sequential Employee ID Block */}
+            <div className="space-y-2 rounded-xl border border-amber-200/90 bg-gradient-to-r from-amber-50/80 via-white to-amber-50/60 p-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-ink-950 flex items-center gap-1.5">
+                  <FileBadge className="size-4 text-gold-700" />
+                  <span>Provisioned Employee ID</span>
+                  <span className="inline-flex items-center rounded-md bg-zinc-200/90 px-1.5 py-0.2 text-[10px] font-bold text-zinc-700">
+                    System-Locked
+                  </span>
+                </label>
+                <span className="text-[11px] font-mono font-bold text-gold-800 bg-gold-100/90 border border-gold-300/80 px-2 py-0.5 rounded-md">
+                  Sequential Branch ID
+                </span>
+              </div>
+
+              <div className="relative">
+                <Input
+                  value={assignedEmpId || 'Generating next ID...'}
+                  disabled
+                  className="bg-white/90 font-mono font-black text-ink-950 text-base tracking-wider border-amber-300 cursor-not-allowed select-all shadow-inner pl-9"
+                />
+                <Lock className="size-4 text-gold-600 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+
+              <p className="text-[11px] text-zinc-500 leading-relaxed">
+                This official Employee ID is sequentially issued by the Bank of Abyssinia directory. It will serve as the staff member's permanent authentication identifier.
+              </p>
+
+              {approveError && (
+                <p className="text-xs text-red-600 font-semibold pt-1">{approveError}</p>
+              )}
+            </div>
+
+            {/* Automated Dispatch Checklist */}
+            <div className="rounded-xl border border-zinc-200/70 bg-zinc-50/60 p-3 space-y-1.5 text-xs text-zinc-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block">
+                Post-Approval Actions
+              </span>
+              <div className="flex items-center gap-2">
+                <Check className="size-3.5 text-emerald-600 shrink-0" />
+                <span>Account status changes to <strong>Active</strong> in branch directory</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="size-3.5 text-emerald-600 shrink-0" />
+                <span>Standard branch KPIs for <strong>{approveUser.position}</strong> will be assigned</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="size-3.5 text-emerald-600 shrink-0" />
+                <span>Automated welcome email with login credentials will be delivered via Brevo</span>
+              </div>
+            </div>
           </div>
         )}
       </Dialog>
 
-      {/* Rejection Modal Dialog */}
+      {/* Decline Registration Modal Dialog */}
       <Dialog
         open={Boolean(rejectUser)}
         onClose={() => {
@@ -451,7 +637,7 @@ export function StaffListPage() {
           setRejectError('');
         }}
         title="Decline Staff Registration"
-        description={`Provide the reason for rejecting ${rejectUser?.fullName}'s registration.`}
+        description={`Provide the official reason for declining ${rejectUser?.fullName}'s registration request.`}
         size="sm"
         busy={rejecting}
         footer={
@@ -467,17 +653,28 @@ export function StaffListPage() {
             >
               Cancel
             </Button>
-            <Button variant="danger" onClick={handleReject} loading={rejecting}>
-              Decline Application
+            <Button variant="danger" onClick={handleReject} loading={rejecting} className="font-bold">
+              Confirm Rejection
             </Button>
           </>
         }
       >
-        <div className="py-2">
-          <Field label="Rejection Reason" error={rejectError} required hint="This message will be visible to the applicant on their status page.">
+        <div className="py-2 space-y-3">
+          {rejectUser && (
+            <div className="rounded-lg bg-zinc-50 p-2.5 text-xs text-zinc-600 border border-zinc-200">
+              <span className="font-semibold text-zinc-900">{rejectUser.fullName}</span> · Ref:{' '}
+              <span className="font-mono">{rejectUser.referenceId}</span>
+            </div>
+          )}
+          <Field
+            label="Rejection Reason"
+            error={rejectError}
+            required
+            hint="This reason will be recorded in the audit log and emailed to the applicant via Brevo."
+          >
             <Textarea
               rows={3}
-              placeholder="e.g. Employee ID not recognized in branch roster; position mismatch..."
+              placeholder="e.g. Employee record not verified in HR roster; incorrect position selected..."
               value={rejectReason}
               onChange={(e) => {
                 setRejectReason(e.target.value);

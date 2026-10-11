@@ -3,6 +3,8 @@ import { ApiError } from '../../utils/apiError.js';
 import { recordAuditLog } from '../audit/audit.service.js';
 import { todayISO, diffInDays } from '../../utils/date.js';
 import { entryPercent, statusFor } from '../../utils/calculations.js';
+import { invalidateOverviewCache } from '../performance/performance.service.js';
+import { invalidateMyAssignedKpis } from '../kpi/kpi.service.js';
 
 export interface EntryFilter {
   staffId?: string;
@@ -24,9 +26,16 @@ export async function listEntries(filter: EntryFilter) {
   const entries = await prisma.kpiEntry.findMany({
     where,
     include: {
-      kpi: true,
+      kpi: {
+        select: {
+          name: true,
+          unit: true,
+          valueType: true,
+        },
+      },
     },
     orderBy: [{ date: 'desc' }, { submittedAt: 'desc' }],
+    take: 100, // Limit to recent 100 entries for high speed
   });
 
   const settings = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
@@ -160,6 +169,9 @@ export async function submitEntries(userId: string, date: string, entries: Array
     actorId: userId,
     details: `Recorded ${savedEntries.length} KPI entry record(s) for operational date ${date}`,
   });
+
+  invalidateOverviewCache();
+  invalidateMyAssignedKpis(userId);
 
   return savedEntries;
 }

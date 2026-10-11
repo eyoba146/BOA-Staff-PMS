@@ -47,7 +47,7 @@ const memoryUsers: StoredUser[] = [
     email: 'abebe.kebede@abyssinia.et',
     phone: '+251911234567',
     position: 'Branch Manager',
-    branchName: 'Finfine Main Branch',
+    branchName: 'Addis Ababa Branch',
     role: 'manager',
     status: 'active',
     passwordHash: defaultPasswordHash,
@@ -63,7 +63,7 @@ const memoryUsers: StoredUser[] = [
     email: 'selam.tesfaye@abyssinia.et',
     phone: '+251911345678',
     position: 'Customer Service Officer (demo)',
-    branchName: 'Finfine Main Branch',
+    branchName: 'Addis Ababa Branch',
     role: 'staff',
     status: 'active',
     passwordHash: defaultPasswordHash,
@@ -81,7 +81,7 @@ const memoryUsers: StoredUser[] = [
     email: 'dawit.alemu@abyssinia.et',
     phone: '+251911456789',
     position: 'Relationship Officer (demo)',
-    branchName: 'Finfine Main Branch',
+    branchName: 'Addis Ababa Branch',
     role: 'staff',
     status: 'active',
     passwordHash: defaultPasswordHash,
@@ -100,7 +100,7 @@ const memoryUsers: StoredUser[] = [
     email: 'hanna.bekele@abyssinia.et',
     phone: '+251911123456',
     position: 'Branch Accountant (demo)',
-    branchName: 'Finfine Main Branch',
+    branchName: 'Addis Ababa Branch',
     role: 'staff',
     status: 'pending_approval',
     passwordHash: defaultPasswordHash,
@@ -117,7 +117,7 @@ const memoryUsers: StoredUser[] = [
     email: 'natnael.girma@abyssinia.et',
     phone: '+251911654321',
     position: 'Cash Officer (demo)',
-    branchName: 'Finfine Main Branch',
+    branchName: 'Addis Ababa Branch',
     role: 'staff',
     status: 'rejected',
     rejectionReason: 'Position quota full for current cycle. Please reapply next quarter.',
@@ -135,7 +135,7 @@ const memoryUsers: StoredUser[] = [
     email: 'elias.desta@abyssinia.et',
     phone: '+251911987654',
     position: 'Customer Service Officer (demo)',
-    branchName: 'Finfine Main Branch',
+    branchName: 'Addis Ababa Branch',
     role: 'staff',
     status: 'pending_email_verification',
     passwordHash: defaultPasswordHash,
@@ -195,6 +195,18 @@ export const userRepository = {
     return memoryUsers.find((u) => u.email.toLowerCase() === cleanEmail) ?? null;
   },
 
+  async findManager(): Promise<StoredUser | null> {
+    if (env.DATABASE_URL) {
+      try {
+        const u = await prisma.user.findFirst({ where: { role: 'manager', status: 'active' } });
+        if (u) return mapPrismaUser(u);
+      } catch {
+        // Fall back to memory
+      }
+    }
+    return memoryUsers.find((u) => u.role === 'manager' && u.status === 'active') ?? null;
+  },
+
   async findByEmployeeId(employeeId: string): Promise<StoredUser | null> {
     const cleanId = employeeId.trim().toUpperCase();
     if (!cleanId) return null;
@@ -226,18 +238,33 @@ export const userRepository = {
   },
 
   async findByIdentifier(identifier: string): Promise<StoredUser | null> {
-    const id = identifier.trim().toLowerCase();
+    const raw = identifier.trim();
+    const id = raw.toLowerCase();
+    const upper = raw.toUpperCase();
+
     if (env.DATABASE_URL) {
       try {
-        const u = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { email: { equals: id, mode: 'insensitive' } },
-              { employeeId: { equals: identifier.trim(), mode: 'insensitive' } },
-              { referenceId: { equals: identifier.trim(), mode: 'insensitive' } },
-            ],
-          },
-        });
+        let u = null;
+        if (raw.includes('@')) {
+          u = await prisma.user.findUnique({ where: { email: id } });
+        } else if (upper.startsWith('BOA-')) {
+          u = await prisma.user.findUnique({ where: { employeeId: upper } });
+        } else if (upper.startsWith('REG-')) {
+          u = await prisma.user.findUnique({ where: { referenceId: upper } });
+        }
+
+        if (!u) {
+          u = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { email: { equals: id, mode: 'insensitive' } },
+                { employeeId: { equals: raw, mode: 'insensitive' } },
+                { referenceId: { equals: raw, mode: 'insensitive' } },
+              ],
+            },
+          });
+        }
+
         if (u) return mapPrismaUser(u);
       } catch {
         // Fall back to memory
@@ -255,6 +282,19 @@ export const userRepository = {
 
   async createUser(data: CreateUserData): Promise<StoredUser> {
     const now = new Date().toISOString();
+    let branch = data.branchName?.trim();
+    if (!branch && env.DATABASE_URL) {
+      try {
+        const s = await prisma.systemSettings.findUnique({ where: { id: 'default' } });
+        if (s?.branchName) branch = s.branchName;
+      } catch {
+        // Fall back
+      }
+    }
+    if (!branch) {
+      branch = 'Addis Ababa Branch';
+    }
+
     const newUser: StoredUser = {
       id: `u_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       employeeId: '',
@@ -263,7 +303,7 @@ export const userRepository = {
       email: data.email.trim().toLowerCase(),
       phone: data.phone.trim(),
       position: data.position.trim(),
-      branchName: data.branchName ?? 'Finfine Main Branch',
+      branchName: branch,
       role: data.role ?? 'staff',
       status: data.status ?? 'pending_email_verification',
       passwordHash: data.passwordHash,
@@ -564,5 +604,64 @@ export const userRepository = {
       }
     }
     return [...memoryUsers];
+  },
+
+  async getNextStaffEmployeeId(): Promise<string> {
+    let maxNum = 0;
+    if (env.DATABASE_URL) {
+      try {
+        const users = await prisma.user.findMany({
+          where: { employeeId: { not: null } },
+          select: { employeeId: true },
+        });
+        for (const u of users) {
+          if (u.employeeId) {
+            const match = u.employeeId.match(/^BOA-S(\d+)$/i);
+            if (match) {
+              const num = parseInt(match[1], 10);
+              if (!isNaN(num) && num > maxNum) maxNum = num;
+            }
+          }
+        }
+        return `BOA-S${String(maxNum + 1).padStart(3, '0')}`;
+      } catch {
+        // Fall through to memory
+      }
+    }
+
+    for (const u of memoryUsers) {
+      if (u.employeeId) {
+        const match = u.employeeId.match(/^BOA-S(\d+)$/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      }
+    }
+    return `BOA-S${String(maxNum + 1).padStart(3, '0')}`;
+  },
+
+  async updateUserProfile(id: string, data: { fullName?: string; email?: string }): Promise<StoredUser | null> {
+    if (env.DATABASE_URL) {
+      try {
+        const updated = await prisma.user.update({
+          where: { id },
+          data: {
+            ...(data.fullName ? { fullName: data.fullName.trim() } : {}),
+            ...(data.email ? { email: data.email.trim().toLowerCase() } : {}),
+          },
+        });
+        return mapPrismaUser(updated);
+      } catch {
+        // Fall through to memory
+      }
+    }
+
+    const user = memoryUsers.find((u) => u.id === id);
+    if (!user) return null;
+    if (data.fullName) user.fullName = data.fullName.trim();
+    if (data.email) user.email = data.email.trim().toLowerCase();
+    user.updatedAt = new Date().toISOString();
+    return user;
   },
 };

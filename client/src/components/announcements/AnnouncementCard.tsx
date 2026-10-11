@@ -1,4 +1,4 @@
-import { Pin, Calendar, User, Archive, Edit } from 'lucide-react';
+import { Pin, Calendar, Archive, Edit, ShieldCheck } from 'lucide-react';
 import type { Announcement } from '@/types';
 import { Card, Badge, Button } from '@/components/ui';
 import { ANNOUNCEMENT_CATEGORY_META } from '@/utils/status';
@@ -88,12 +88,13 @@ export function AnnouncementCard({
           {announcement.body}
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-zinc-500 pt-3 border-t border-zinc-100">
-          <span className="flex items-center gap-1">
-            <User className="size-3.5 text-zinc-400" />
-            {announcement.authorName}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500 pt-3 border-t border-zinc-100">
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-950 border border-amber-200 shadow-2xs">
+              <ShieldCheck className="size-3 text-amber-800" /> Issued by: Branch Manager ({announcement.authorName || 'Branch Management'})
+            </span>
           </span>
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1 text-zinc-400">
             <Calendar className="size-3.5 text-zinc-400" />
             {formatDateTime(announcement.publishedAt ?? announcement.createdAt)}
           </span>

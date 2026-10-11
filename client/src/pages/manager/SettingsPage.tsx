@@ -7,9 +7,14 @@ import {
   Hash,
   Save,
   CheckCircle2,
+  Mail,
+  User as UserIcon,
+  Clock,
 } from 'lucide-react';
 import { settingsService } from '@/services/settings.service';
 import { authService } from '@/services/auth.service';
+import { toApiError } from '@/services/http/apiClient';
+import { useVerificationTimer } from '@/hooks/useVerificationTimer';
 import { env } from '@/config/env';
 import { useAuth } from '@/context/AuthContext';
 import { useAsync } from '@/hooks/useAsync';
@@ -23,6 +28,8 @@ import {
   Field,
   Input,
   Checkbox,
+  Dialog,
+  Alert,
 } from '@/components/ui';
 import { required, strongPassword, validateForm, hasErrors } from '@/utils/validation';
 import { PositionManagementSection } from '@/components/manager';
@@ -37,6 +44,38 @@ export function SettingsPage() {
   }, []);
 
   const state = useAsync(loadSettings, [loadSettings]);
+
+  // Branch Manager Profile state
+  const [managerFullName, setManagerFullName] = useState(user?.fullName || '');
+  const [savingManagerName, setSavingManagerName] = useState(false);
+  const [managerNameError, setManagerNameError] = useState<string | null>(null);
+
+  // Email change state
+  const [newManagerEmail, setNewManagerEmail] = useState('');
+  const [emailChangeError, setEmailChangeError] = useState<string | null>(null);
+  const [requestingEmailChange, setRequestingEmailChange] = useState(false);
+  const [emailChangeModalOpen, setEmailChangeModalOpen] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [verifyModalError, setVerifyModalError] = useState<string | null>(null);
+  const [pendingEmailTimestamps, setPendingEmailTimestamps] = useState<{
+    expiresAt: string | null;
+    resendAfter: string | null;
+    serverTime: string | null;
+  }>({ expiresAt: null, resendAfter: null, serverTime: null });
+
+  const emailTimer = useVerificationTimer({
+    expiresAt: pendingEmailTimestamps.expiresAt,
+    resendAfter: pendingEmailTimestamps.resendAfter,
+    serverTime: pendingEmailTimestamps.serverTime,
+    autoStart: emailChangeModalOpen,
+  });
+
+  useEffect(() => {
+    if (user?.fullName) {
+      setManagerFullName(user.fullName);
+    }
+  }, [user?.fullName]);
 
   // Branch Information state
   const [branchName, setBranchName] = useState('');
@@ -78,6 +117,125 @@ export function SettingsPage() {
       setWeightingEnabled(state.data.weightingEnabled);
     }
   }, [state.data]);
+
+  const handleSaveManagerName = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = managerFullName.trim();
+    if (!trimmed || trimmed.length < 3) {
+      setManagerNameError('Full name must be at least 3 characters.');
+      return;
+    }
+    setManagerNameError(null);
+    setSavingManagerName(true);
+    try {
+      const updatedUser = await settingsService.updateManagerProfile({ fullName: trimmed });
+      updateUser(updatedUser);
+      showToast({
+        tone: 'success',
+        title: 'Manager Profile Updated',
+        message: `Branch Manager name has been updated to "${trimmed}".`,
+      });
+    } catch (err) {
+      const apiErr = toApiError(err);
+      setManagerNameError(apiErr.message);
+      showToast({ tone: 'danger', title: 'Update Failed', message: apiErr.message });
+    } finally {
+      setSavingManagerName(false);
+    }
+  };
+
+  const handleRequestEmailChange = async (e: FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = newManagerEmail.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setEmailChangeError('Please enter a valid email address.');
+      return;
+    }
+    if (cleanEmail === user?.email.toLowerCase()) {
+      setEmailChangeError('New email must be different from the current manager email.');
+      return;
+    }
+
+    setEmailChangeError(null);
+    setRequestingEmailChange(true);
+    try {
+      const res = await settingsService.requestManagerEmailChange({ newEmail: cleanEmail });
+      setPendingEmailTimestamps({
+        expiresAt: res.expiresAt,
+        resendAfter: res.resendAfter,
+        serverTime: res.serverTime,
+      });
+      emailTimer.restart(res.expiresAt, res.resendAfter, res.serverTime);
+      setVerificationCode('');
+      setVerifyModalError(null);
+      setEmailChangeModalOpen(true);
+      showToast({
+        tone: 'gold',
+        title: 'Verification Code Sent',
+        message: `A 6-digit code was dispatched to ${cleanEmail}.`,
+      });
+    } catch (err) {
+      const apiErr = toApiError(err);
+      setEmailChangeError(apiErr.message);
+      showToast({ tone: 'danger', title: 'Request Failed', message: apiErr.message });
+    } finally {
+      setRequestingEmailChange(false);
+    }
+  };
+
+  const handleResendEmailCode = async () => {
+    if (!emailTimer.canResend) return;
+    try {
+      const res = await settingsService.requestManagerEmailChange({ newEmail: newManagerEmail.trim().toLowerCase() });
+      setPendingEmailTimestamps({
+        expiresAt: res.expiresAt,
+        resendAfter: res.resendAfter,
+        serverTime: res.serverTime,
+      });
+      emailTimer.restart(res.expiresAt, res.resendAfter, res.serverTime);
+      showToast({
+        tone: 'gold',
+        title: 'New Code Dispatched',
+        message: `A new 6-digit verification code has been sent.`,
+      });
+    } catch (err) {
+      const apiErr = toApiError(err);
+      setVerifyModalError(apiErr.message);
+    }
+  };
+
+  const handleVerifyEmailChange = async (e: FormEvent) => {
+    e.preventDefault();
+    const cleanCode = verificationCode.trim();
+    if (cleanCode.length !== 6) {
+      setVerifyModalError('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setVerifyingCode(true);
+    setVerifyModalError(null);
+    try {
+      const res = await settingsService.verifyManagerEmailChange({
+        newEmail: newManagerEmail.trim().toLowerCase(),
+        code: cleanCode,
+      });
+      updateUser(res.user);
+      setEmailChangeModalOpen(false);
+      setNewManagerEmail('');
+      setVerificationCode('');
+      showToast({
+        tone: 'success',
+        title: 'Email Address Updated',
+        message: `Branch Manager email updated to "${res.user.email}".`,
+      });
+    } catch (err) {
+      const apiErr = toApiError(err);
+      setVerifyModalError(apiErr.message);
+      showToast({ tone: 'danger', title: 'Verification Failed', message: apiErr.message });
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
 
   const handleSaveBranch = async (e: FormEvent) => {
     e.preventDefault();
@@ -328,6 +486,110 @@ export function SettingsPage() {
                 </CardBody>
               </Card>
 
+              {/* Branch Manager Profile & Account Credentials */}
+              <Card>
+                <CardHeader
+                  title="Branch Manager Identity & Credentials"
+                  description="Administrative credentials and official identity of the presiding Branch Manager. Changing manager identity updates official records, while email updates require 6-digit Brevo email verification."
+                  actions={
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-gold-300 bg-gold-50 px-2.5 py-0.5 text-xs font-semibold text-gold-900">
+                      <ShieldCheck className="size-3.5 text-gold-600" />
+                      Appointed Manager
+                    </span>
+                  }
+                />
+                <CardBody className="space-y-6">
+                  {/* Manager Full Name Update */}
+                  <form onSubmit={handleSaveManagerName} className="space-y-4 pb-6 border-b border-zinc-100">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-zinc-900">Manager Full Name</h4>
+                      <span className="text-[11px] font-mono text-zinc-400">Employee ID: {user?.employeeId || 'BOA-M001'}</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                      <div className="flex-1">
+                        <Field
+                          label="Full Name"
+                          error={managerNameError || undefined}
+                          hint="Official first, father's, and grandfather's name of the manager."
+                          required
+                        >
+                          <Input
+                            value={managerFullName}
+                            onChange={(e) => {
+                              setManagerFullName(e.target.value);
+                              if (managerNameError) setManagerNameError(null);
+                            }}
+                            leftIcon={<UserIcon className="size-4 text-zinc-400" />}
+                            placeholder="e.g. Abebe Kebede"
+                          />
+                        </Field>
+                      </div>
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        loading={savingManagerName}
+                        leftIcon={<Save className="size-3.5" />}
+                        className="sm:mb-6"
+                      >
+                        Update Name
+                      </Button>
+                    </div>
+                  </form>
+
+                  {/* Manager Email Update with Verification */}
+                  <form onSubmit={handleRequestEmailChange} className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-zinc-900">Manager Email Address</h4>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        Changing the manager email requires a 6-digit verification code sent to the new address before the update is applied.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-zinc-200/80 bg-zinc-50/70 p-3 text-xs flex items-center justify-between">
+                      <div>
+                        <span className="text-zinc-400 block text-[11px]">Current Registered Email</span>
+                        <span className="font-semibold text-zinc-900 font-mono mt-0.5 block">{user?.email}</span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                        <CheckCircle2 className="size-3" />
+                        Verified Active
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                      <div className="flex-1">
+                        <Field
+                          label="New Email Address"
+                          error={emailChangeError || undefined}
+                          hint="Enter the new official email address to transfer manager notifications and recovery access."
+                          required
+                        >
+                          <Input
+                            type="email"
+                            value={newManagerEmail}
+                            onChange={(e) => {
+                              setNewManagerEmail(e.target.value);
+                              if (emailChangeError) setEmailChangeError(null);
+                            }}
+                            leftIcon={<Mail className="size-4 text-zinc-400" />}
+                            placeholder="e.g. new.manager@abyssinia.et"
+                          />
+                        </Field>
+                      </div>
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        loading={requestingEmailChange}
+                        leftIcon={<Mail className="size-3.5" />}
+                        className="sm:mb-6"
+                      >
+                        Send Verification Code
+                      </Button>
+                    </div>
+                  </form>
+                </CardBody>
+              </Card>
+
               {/* Branch Staff Positions Management */}
               <PositionManagementSection />
 
@@ -513,6 +775,85 @@ export function SettingsPage() {
                 destructive
                 loading={resetting}
               />
+
+              {/* Manager Email Verification Dialog */}
+              <Dialog
+                open={emailChangeModalOpen}
+                onClose={() => {
+                  if (!verifyingCode) setEmailChangeModalOpen(false);
+                }}
+                title="Verify New Manager Email Address"
+                description={`Enter the 6-digit authorization code dispatched to ${newManagerEmail}.`}
+                size="md"
+                busy={verifyingCode}
+                footer={
+                  <>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setEmailChangeModalOpen(false)}
+                      disabled={verifyingCode}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      onClick={handleVerifyEmailChange}
+                      loading={verifyingCode}
+                      disabled={verificationCode.trim().length !== 6 || emailTimer.isExpired}
+                    >
+                      Confirm Email Update
+                    </Button>
+                  </>
+                }
+              >
+                <div className="space-y-4 py-2">
+                  <Alert tone="info">
+                    A secure 6-digit verification code has been dispatched to{' '}
+                    <strong className="text-zinc-900 font-bold">{newManagerEmail}</strong>.
+                    This code expires in 5 minutes.
+                  </Alert>
+
+                  <Field
+                    label="6-Digit Verification Code"
+                    error={verifyModalError || undefined}
+                    required
+                    hint="Check your inbox or spam folder for the one-time code."
+                  >
+                    <Input
+                      value={verificationCode}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        setVerificationCode(val);
+                        if (verifyModalError) setVerifyModalError(null);
+                      }}
+                      placeholder="• • • • • •"
+                      maxLength={6}
+                      autoFocus
+                      className="text-center font-mono text-xl tracking-[0.3em] font-black h-12"
+                    />
+                  </Field>
+
+                  {/* Expiration countdown & resend */}
+                  <div className="flex items-center justify-between text-xs text-zinc-500 pt-1">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <Clock className="size-3.5 text-zinc-400" />
+                      {emailTimer.isExpired ? (
+                        <span className="text-red-600 font-semibold">Code expired</span>
+                      ) : (
+                        <span>Expires in {emailTimer.formatExpires}</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!emailTimer.canResend || verifyingCode}
+                      onClick={handleResendEmailCode}
+                      className="font-medium text-gold-700 hover:text-gold-800 disabled:text-zinc-400 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {emailTimer.canResend ? 'Resend Code' : `Resend in ${emailTimer.formatResend}`}
+                    </button>
+                  </div>
+                </div>
+              </Dialog>
             </div>
           );
         }}

@@ -17,11 +17,7 @@ export function StaffPerformancePage() {
   });
 
   const loadData = useCallback(async () => {
-    const [summary, trend] = await Promise.all([
-      performanceService.getMySummary(periodState.period, periodState.date),
-      performanceService.getMyTrend(periodState.period, periodState.date),
-    ]);
-    return { summary, trend };
+    return performanceService.getMyDashboard(periodState.period, periodState.date);
   }, [periodState.period, periodState.date]);
 
   const state = useAsync(loadData, [loadData]);

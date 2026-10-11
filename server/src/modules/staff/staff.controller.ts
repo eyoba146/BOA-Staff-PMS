@@ -32,6 +32,15 @@ export const staffController = {
     }
   },
 
+  async getNextEmployeeId(req: Request, res: Response, next: NextFunction) {
+    try {
+      const employeeId = await staffService.getNextEmployeeId();
+      res.json({ employeeId });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async approve(req: Request, res: Response, next: NextFunction) {
     try {
       const approved = await staffService.approve(
@@ -88,6 +97,26 @@ export const staffController = {
     try {
       const directory = await staffService.listDirectory();
       res.json(directory);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async requestEmailChange(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) throw ApiError.unauthorized();
+      const result = await staffService.requestEmailChange(req.user.userId, req.body, req.ip);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async verifyEmailChange(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) throw ApiError.unauthorized();
+      const updated = await staffService.verifyEmailChange(req.user.userId, req.body, req.ip);
+      res.json(updated);
     } catch (err) {
       next(err);
     }

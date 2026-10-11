@@ -34,22 +34,22 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <div className="min-h-dvh lg:pl-72">
+    <div className="min-h-dvh lg:pl-72 print:pl-0 print:min-h-0">
       <a
         href="#main"
-        className="sr-only z-50 rounded-md bg-ink-900 px-3 py-2 text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        className="sr-only z-50 rounded-md bg-ink-900 px-3 py-2 text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3 print:hidden"
       >
         Skip to content
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 lg:block">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 lg:block print:hidden">
         <Sidebar counts={counts} />
       </aside>
 
       <dialog
         ref={drawerRef}
         aria-label="Navigation menu"
-        className="drawer m-0 h-dvh max-h-none w-80 max-w-[85vw] bg-ink-950 p-0"
+        className="drawer m-0 h-dvh max-h-none w-80 max-w-[85vw] bg-ink-950 p-0 print:hidden"
         onCancel={(e) => {
           e.preventDefault();
           setDrawerOpen(false);
@@ -59,10 +59,12 @@ export function AppLayout() {
         <Sidebar counts={counts} onNavigate={() => setDrawerOpen(false)} />
       </dialog>
 
-      <div className="flex min-h-dvh flex-col">
-        <Topbar onOpenMenu={() => setDrawerOpen(true)} counts={counts} />
-        <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8">
-          <div className="mx-auto w-full max-w-[1440px]">
+      <div className="flex min-h-dvh flex-col print:min-h-0 print:block">
+        <div className="print:hidden">
+          <Topbar onOpenMenu={() => setDrawerOpen(true)} counts={counts} />
+        </div>
+        <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8 print:p-0 print:overflow-visible">
+          <div className="mx-auto w-full max-w-[1440px] print:max-w-none">
             <Outlet />
           </div>
         </main>

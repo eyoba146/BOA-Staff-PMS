@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 import { ApiError } from '../utils/apiError.js';
 import { logger } from '../utils/logger.js';
-import { env } from '../config/env.js';
 
 export function errorHandler(
   err: unknown,
@@ -59,10 +58,9 @@ export function errorHandler(
 
   // 4. Unexpected Internal Error
   logger.error('Unhandled internal server error', {
-    url: req.url,
+    route: req.path,
     method: req.method,
-    error: err instanceof Error ? err.message : String(err),
-    stack: env.NODE_ENV === 'development' && err instanceof Error ? err.stack : undefined,
+    error: err instanceof Error ? err.name : 'unknown',
   });
 
   res.status(500).json({

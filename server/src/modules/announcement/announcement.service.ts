@@ -1,8 +1,34 @@
 import { prisma } from '../../config/database.js';
 import { ApiError } from '../../utils/apiError.js';
 import { recordAuditLog } from '../audit/audit.service.js';
+import { realtimeService } from '../realtime/realtime.service.js';
+
+interface CachedAnnouncements {
+  data: any;
+  timestamp: number;
+}
+const announcementCache = new Map<string, CachedAnnouncements>();
+const ANNOUNCEMENT_CACHE_TTL = 30000;
+
+export function invalidateAnnouncementCache(userId?: string) {
+  if (userId) {
+    for (const key of announcementCache.keys()) {
+      if (key.startsWith(`${userId}_`)) {
+        announcementCache.delete(key);
+      }
+    }
+  } else {
+    announcementCache.clear();
+  }
+}
 
 export async function listAnnouncements(userId: string, role: string, statusFilter?: string) {
+  const cacheKey = `${userId}_${role}_${statusFilter ?? 'all'}`;
+  const cached = announcementCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < ANNOUNCEMENT_CACHE_TTL) {
+    return cached.data;
+  }
+
   const where: any = {};
   if (role === 'manager') {
     if (statusFilter) {
@@ -26,7 +52,7 @@ export async function listAnnouncements(userId: string, role: string, statusFilt
     ],
   });
 
-  return list.map((a: any) => ({
+  const result = list.map((a: any) => ({
     id: a.id,
     title: a.title,
     body: a.body,
@@ -40,6 +66,9 @@ export async function listAnnouncements(userId: string, role: string, statusFilt
     updatedAt: a.updatedAt.toISOString(),
     isRead: a.reads.length > 0,
   }));
+
+  announcementCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  return result;
 }
 
 export async function createAnnouncement(authorId: string, input: any) {
@@ -67,7 +96,7 @@ export async function createAnnouncement(authorId: string, input: any) {
     details: `Created announcement "${created.title}" (status: ${created.status})`,
   });
 
-  return {
+  const dto = {
     id: created.id,
     title: created.title,
     body: created.body,
@@ -81,6 +110,14 @@ export async function createAnnouncement(authorId: string, input: any) {
     updatedAt: created.updatedAt.toISOString(),
     isRead: true, // author automatically viewed
   };
+
+  if (isPublish) {
+    realtimeService.broadcastToBranch('announcement_created', dto);
+    realtimeService.notifyCountInvalidated();
+  }
+  invalidateAnnouncementCache();
+
+  return dto;
 }
 
 export async function updateAnnouncement(id: string, authorId: string, input: any) {
@@ -112,6 +149,8 @@ export async function updateAnnouncement(id: string, authorId: string, input: an
     actorId: authorId,
     details: `Updated announcement "${updated.title}"`,
   });
+
+  invalidateAnnouncementCache();
 
   return {
     id: updated.id,
@@ -149,6 +188,8 @@ export async function archiveAnnouncement(id: string, authorId: string) {
     details: `Archived announcement "${updated.title}"`,
   });
 
+  invalidateAnnouncementCache();
+
   return {
     id: updated.id,
     title: updated.title,
@@ -179,4 +220,7 @@ export async function markAnnouncementRead(announcementId: string, userId: strin
       userId,
     },
   });
+
+  realtimeService.notifyCountInvalidated([userId]);
+  invalidateAnnouncementCache(userId);
 }

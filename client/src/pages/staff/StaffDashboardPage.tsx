@@ -1,13 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ClipboardPenLine,
-  TrendingUp,
-  MessageSquareText,
-  Megaphone,
-  CheckCircle2,
-  Clock,
   ArrowRight,
+  CheckCircle2,
+  ClipboardPenLine,
+  Clock,
+  Megaphone,
+  MessageSquareText,
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 import { useCurrentUser } from '@/context/AuthContext';
 import { useAsync } from '@/hooks/useAsync';
@@ -19,9 +20,32 @@ import { todayISO, formatDate } from '@/utils/date';
 import { formatPercent } from '@/utils/format';
 import { paths } from '@/routes/paths';
 import type { PerformancePeriod } from '@/types';
-import { PageHeader, StatCard, PeriodSelector, PendingValidationNotice, AsyncBoundary } from '@/components/shared';
+import {
+  PageHeader,
+  StatCard,
+  PeriodSelector,
+  PendingValidationNotice,
+  AsyncBoundary,
+} from '@/components/shared';
 import { TrendChart } from '@/components/dashboard/TrendChart';
-import { Card, CardHeader, CardBody, Button, PerformanceStatusBadge, Badge, ProgressBar } from '@/components/ui';
+import {
+  Card,
+  CardHeader,
+  CardBody,
+  Button,
+  PerformanceStatusBadge,
+  Badge,
+  ProgressBar,
+} from '@/components/ui';
+
+interface SupportingData {
+  feedbackList: Awaited<ReturnType<typeof feedbackService.listMine>>;
+  announcementsList: Awaited<ReturnType<typeof announcementService.list>>;
+  assignedKpis: Awaited<ReturnType<typeof kpiService.getMyAssignedKpis>>;
+  todaySubmittedCount: number;
+  isTodayComplete: boolean;
+  unreadFeedbackCount: number;
+}
 
 export function StaffDashboardPage() {
   const user = useCurrentUser();
@@ -30,37 +54,38 @@ export function StaffDashboardPage() {
     date: todayISO(),
   });
 
-  const loadData = useCallback(async () => {
-    const [summary, trend, feedbackList, announcementsList, assignedKpis] = await Promise.all([
-      performanceService.getMySummary(periodState.period, periodState.date),
-      performanceService.getMyTrend(periodState.period, periodState.date),
+  const loadPerformance = useCallback(
+    () => performanceService.getMyDashboard(periodState.period, periodState.date),
+    [periodState.period, periodState.date],
+  );
+  const performanceState = useAsync(loadPerformance, [loadPerformance]);
+
+  const loadSupporting = useCallback(async (): Promise<SupportingData> => {
+    const [feedbackList, announcementsList, assignedKpis] = await Promise.all([
       feedbackService.listMine(),
       announcementService.list(),
       kpiService.getMyAssignedKpis(todayISO()),
     ]);
-
-    const todaySubmittedCount = assignedKpis.filter((k) => k.entry !== null).length;
-    const isTodayComplete = assignedKpis.length > 0 && todaySubmittedCount === assignedKpis.length;
-
+    const todaySubmittedCount = assignedKpis.filter((kpi) => kpi.entry !== null).length;
     return {
-      summary,
-      trend,
       feedbackList: feedbackList.slice(0, 3),
-      unreadFeedbackCount: feedbackList.filter((f) => !f.readAt).length,
+      unreadFeedbackCount: feedbackList.filter((feedback) => !feedback.readAt).length,
       announcementsList: announcementsList.slice(0, 3),
       assignedKpis,
       todaySubmittedCount,
-      isTodayComplete,
+      isTodayComplete: assignedKpis.length > 0 && todaySubmittedCount === assignedKpis.length,
     };
-  }, [periodState.period, periodState.date]);
+  }, []);
+  const supportingState = useAsync(loadSupporting, [loadSupporting]);
 
-  const state = useAsync(loadData, [loadData]);
+  const supportingData = supportingState.data;
 
   return (
     <div className="space-y-6">
+      {/* 1. Header with greeting, date, role, branch, and period selector */}
       <PageHeader
         title={`Welcome back, ${user.fullName.split(' ')[0]}`}
-        description={`${user.position} · ${user.branchName}`}
+        description={`${formatDate(todayISO(), 'long')} · ${user.position} · ${user.branchName}`}
         documentTitle="Staff Dashboard"
         actions={
           <PeriodSelector
@@ -71,191 +96,249 @@ export function StaffDashboardPage() {
         }
       />
 
-      <AsyncBoundary state={state}>
-        {(data) => {
-          const { summary, trend, feedbackList, unreadFeedbackCount, announcementsList, assignedKpis, todaySubmittedCount, isTodayComplete } = data;
-
-          return (
-            <div className="space-y-6">
-              {/* Daily Entry Status Callout */}
-              <div className="rounded-lg border border-zinc-200 bg-white p-4 shadow-xs sm:p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-start gap-3.5">
-                    <span
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
-                        isTodayComplete
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-gold-50 text-gold-800 border border-gold-200'
-                      }`}
-                    >
-                      {isTodayComplete ? <CheckCircle2 className="size-5" /> : <Clock className="size-5" />}
-                    </span>
-                    <div>
-                      <h2 className="text-sm font-semibold text-zinc-900">
-                        {isTodayComplete ? "Today's KPI Entries Recorded" : "Today's KPI Entry Pending"}
-                      </h2>
-                      <p className="mt-0.5 text-xs text-zinc-500">
-                        {formatDate(todayISO(), 'long')} — {todaySubmittedCount} of {assignedKpis.length} assigned indicators submitted.
-                      </p>
-                    </div>
-                  </div>
-
-                  <Link to={paths.staff.kpiEntry}>
-                    <Button
-                      variant={isTodayComplete ? 'secondary' : 'accent'}
-                      size="md"
-                      leftIcon={<ClipboardPenLine className="size-4" />}
-                      rightIcon={<ArrowRight className="size-4" />}
-                    >
-                      {isTodayComplete ? 'Review / Update Entry' : 'Record Daily Entry'}
-                    </Button>
-                  </Link>
+      {/* 2. Today's KPI Entry Callout Banner (status + CTA) */}
+      {supportingData && (
+        <div
+          className={`rounded-xl border p-4.5 sm:p-5 shadow-xs transition-all ${
+            supportingData.isTodayComplete
+              ? 'border-emerald-200 bg-gradient-to-r from-emerald-50/70 via-white to-white'
+              : 'border-gold-300/80 bg-gradient-to-r from-gold-50/90 via-amber-50/30 to-white'
+          }`}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3.5">
+              <span
+                className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${
+                  supportingData.isTodayComplete
+                    ? 'bg-emerald-100/80 text-emerald-700 border border-emerald-300/60'
+                    : 'bg-gold-500/20 text-gold-800 border border-gold-300'
+                }`}
+              >
+                {supportingData.isTodayComplete ? (
+                  <CheckCircle2 className="size-6 text-emerald-600" />
+                ) : (
+                  <Clock className="size-6 text-gold-700" />
+                )}
+              </span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-zinc-900">
+                    {supportingData.isTodayComplete
+                      ? "Today's Operational KPI Entries Recorded"
+                      : "Daily KPI Entry Required"}
+                  </h2>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      supportingData.isTodayComplete
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        : 'bg-gold-100 text-gold-900 border border-gold-300'
+                    }`}
+                  >
+                    {supportingData.todaySubmittedCount} of {supportingData.assignedKpis.length} Submitted
+                  </span>
                 </div>
-              </div>
-
-              {/* Notice regarding demonstration calculation basis */}
-              <PendingValidationNotice basis={summary.calculationBasis} />
-
-              {/* KPI Stat Row */}
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard
-                  label="Performance Achievement"
-                  value={formatPercent(summary.overallPercent)}
-                  icon={TrendingUp}
-                  meta={
-                    <div className="flex items-center gap-2">
-                      <PerformanceStatusBadge status={summary.status} />
-                      <span className="text-xs text-zinc-400">for {summary.periodLabel}</span>
-                    </div>
-                  }
-                />
-                <StatCard
-                  label="Entries Recorded"
-                  value={`${summary.entriesSubmitted} / ${summary.entriesExpected}`}
-                  icon={ClipboardPenLine}
-                  meta={<span className="text-xs text-zinc-500">Required entries for period</span>}
-                />
-                <StatCard
-                  label="Assigned Indicators"
-                  value={summary.kpiResults.length}
-                  meta={<span className="text-xs text-zinc-500">Active assigned KPIs</span>}
-                />
-                <StatCard
-                  label="Management Feedback"
-                  value={unreadFeedbackCount > 0 ? `${unreadFeedbackCount} Unread` : 'All read'}
-                  icon={MessageSquareText}
-                  meta={
-                    <Link to={paths.staff.feedback} className="text-xs text-zinc-900 font-medium underline underline-offset-2">
-                      View all feedback
-                    </Link>
-                  }
-                />
-              </div>
-
-              {/* Trend Chart (2/3) + Assigned Indicators Breakdown (1/3) */}
-              <div className="grid gap-6 xl:grid-cols-3">
-                <Card className="xl:col-span-2">
-                  <CardHeader
-                    title="Performance Trend"
-                    description={`Historical trajectory over recent ${periodState.period} periods.`}
-                  />
-                  <CardBody>
-                    <TrendChart data={trend} height={260} />
-                  </CardBody>
-                </Card>
-
-                <Card>
-                  <CardHeader
-                    title="Current Indicators"
-                    description={`Results for ${summary.periodLabel}`}
-                  />
-                  <CardBody className="space-y-4">
-                    {summary.kpiResults.length === 0 ? (
-                      <p className="text-xs text-zinc-500">No KPIs assigned for this period.</p>
-                    ) : (
-                      summary.kpiResults.map((r) => (
-                        <div key={r.kpiId} className="space-y-1.5">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium text-zinc-800 truncate">{r.kpiName}</span>
-                            <span className="font-semibold text-zinc-900 tabular">
-                              {formatPercent(r.performancePercent)}
-                            </span>
-                          </div>
-                          <ProgressBar percent={r.performancePercent} status={r.status} label={r.kpiName} />
-                        </div>
-                      ))
-                    )}
-                  </CardBody>
-                </Card>
-              </div>
-
-              {/* Bottom split: Recent Feedback & Announcements */}
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Recent Feedback */}
-                <Card>
-                  <CardHeader
-                    title="Recent Management Feedback"
-                    icon={<MessageSquareText />}
-                    actions={
-                      <Link to={paths.staff.feedback} className="text-xs font-medium text-zinc-600 hover:text-zinc-900">
-                        View all
-                      </Link>
-                    }
-                  />
-                  <CardBody className="space-y-3">
-                    {feedbackList.length === 0 ? (
-                      <p className="text-xs text-zinc-500">No management feedback received yet.</p>
-                    ) : (
-                      feedbackList.map((f) => (
-                        <div key={f.id} className="rounded-md border border-zinc-100 bg-zinc-50/60 p-3 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-zinc-900">{f.subject}</span>
-                            {!f.readAt && <Badge tone="gold">New</Badge>}
-                          </div>
-                          <p className="mt-1 text-zinc-600 line-clamp-2">{f.message}</p>
-                          <div className="mt-2 text-[11px] text-zinc-400">
-                            From {f.managerName} · {formatDate(f.createdAt, 'short')}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </CardBody>
-                </Card>
-
-                {/* Announcements */}
-                <Card>
-                  <CardHeader
-                    title="Branch Announcements"
-                    icon={<Megaphone />}
-                    actions={
-                      <Link to={paths.staff.announcements} className="text-xs font-medium text-zinc-600 hover:text-zinc-900">
-                        View all
-                      </Link>
-                    }
-                  />
-                  <CardBody className="space-y-3">
-                    {announcementsList.length === 0 ? (
-                      <p className="text-xs text-zinc-500">No branch announcements posted.</p>
-                    ) : (
-                      announcementsList.map((a) => (
-                        <div key={a.id} className="rounded-md border border-zinc-100 bg-zinc-50/60 p-3 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-zinc-900">{a.title}</span>
-                            <Badge tone="neutral">{a.category}</Badge>
-                          </div>
-                          <p className="mt-1 text-zinc-600 line-clamp-2">{a.body}</p>
-                          <div className="mt-2 text-[11px] text-zinc-400">
-                            {formatDate(a.publishedAt ?? a.createdAt, 'short')}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </CardBody>
-                </Card>
+                <p className="mt-1 text-xs text-zinc-600">
+                  {supportingData.isTodayComplete
+                    ? `All required operational indicators for ${formatDate(todayISO(), 'long')} have been submitted to branch records.`
+                    : `Please record your daily figures for ${formatDate(todayISO(), 'long')} before close of operational window.`}
+                </p>
               </div>
             </div>
-          );
-        }}
+            <Link to={paths.staff.kpiEntry} className="shrink-0">
+              <Button
+                variant={supportingData.isTodayComplete ? 'secondary' : 'accent'}
+                size="md"
+                leftIcon={<ClipboardPenLine className="size-4" />}
+                rightIcon={<ArrowRight className="size-4" />}
+              >
+                {supportingData.isTodayComplete ? 'Review / Update Entry' : 'Record Daily Entry'}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Core Performance Statistics, Trend Chart & KPI Status List */}
+      <AsyncBoundary state={performanceState}>
+        {({ summary, trend }) => (
+          <div className="space-y-6">
+            <PendingValidationNotice basis={summary.calculationBasis} />
+
+            {/* Stat Row: Overall %, Status, Entries Submitted/Expected, Unread Feedback */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label="Overall Achievement"
+                value={formatPercent(summary.overallPercent)}
+                icon={TrendingUp}
+                meta={
+                  <div className="flex items-center gap-2">
+                    <PerformanceStatusBadge status={summary.status} />
+                    <span className="text-xs text-zinc-400">for {summary.periodLabel}</span>
+                  </div>
+                }
+              />
+              <StatCard
+                label="Entries Recorded"
+                value={`${summary.entriesSubmitted} / ${summary.entriesExpected}`}
+                icon={ClipboardPenLine}
+                meta={<span className="text-xs text-zinc-500">Submitted entries for period</span>}
+              />
+              <StatCard
+                label="Assigned Indicators"
+                value={summary.kpiResults.length}
+                icon={Sparkles}
+                meta={<span className="text-xs text-zinc-500">Active branch KPI assignments</span>}
+              />
+              <StatCard
+                label="Management Feedback"
+                value={
+                  supportingData
+                    ? supportingData.unreadFeedbackCount > 0
+                      ? `${supportingData.unreadFeedbackCount} Unread`
+                      : 'All read'
+                    : 'Loading...'
+                }
+                icon={MessageSquareText}
+                meta={
+                  <Link
+                    to={paths.staff.feedback}
+                    className="text-xs text-zinc-900 font-medium underline underline-offset-2 hover:text-gold-700"
+                  >
+                    View feedback history
+                  </Link>
+                }
+              />
+            </div>
+
+            {/* Main Visual: Trend Chart (2/3) + KPI Status List (1/3) */}
+            <div className="grid gap-6 xl:grid-cols-3">
+              <Card className="xl:col-span-2">
+                <CardHeader
+                  title="Performance Trajectory & Trend"
+                  description={`Historical attainment trajectory over recent ${periodState.period} operational cycles.`}
+                />
+                <CardBody>
+                  <TrendChart data={trend} height={260} />
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader
+                  title="Current Indicators"
+                  description={`Attainment results for ${summary.periodLabel}`}
+                />
+                <CardBody className="space-y-4">
+                  {summary.kpiResults.length === 0 ? (
+                    <p className="text-xs text-zinc-500">No KPIs assigned for this period.</p>
+                  ) : (
+                    summary.kpiResults.map((result) => (
+                      <div key={result.kpiId} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-zinc-800 truncate" title={result.kpiName}>
+                            {result.kpiName}
+                          </span>
+                          <span className="font-semibold text-zinc-900 tabular">
+                            {formatPercent(result.performancePercent)}
+                          </span>
+                        </div>
+                        <ProgressBar
+                          percent={result.performancePercent}
+                          status={result.status}
+                          label={result.kpiName}
+                        />
+                      </div>
+                    ))
+                  )}
+                </CardBody>
+              </Card>
+            </div>
+          </div>
+        )}
+      </AsyncBoundary>
+
+      {/* 4. Supporting Intelligence: Recent Management Feedback (1/2) + Branch Announcements (1/2) */}
+      <AsyncBoundary state={supportingState}>
+        {(data) => (
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader
+                title="Recent Management Feedback"
+                icon={<MessageSquareText />}
+                actions={
+                  <Link
+                    to={paths.staff.feedback}
+                    className="text-xs font-semibold text-zinc-700 hover:text-zinc-900"
+                  >
+                    View all
+                  </Link>
+                }
+              />
+              <CardBody className="space-y-3">
+                {data.feedbackList.length === 0 ? (
+                  <p className="text-xs text-zinc-500 py-3">No management feedback received yet.</p>
+                ) : (
+                  data.feedbackList.map((feedback) => (
+                    <div
+                      key={feedback.id}
+                      className="rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-3.5 text-xs transition-colors hover:border-zinc-300"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-zinc-900">{feedback.subject}</span>
+                        {!feedback.readAt && <Badge tone="gold">New</Badge>}
+                      </div>
+                      <p className="mt-1 text-zinc-600 line-clamp-2 leading-relaxed">
+                        {feedback.message}
+                      </p>
+                      <div className="mt-2 text-[11px] text-zinc-400 font-medium">
+                        From {feedback.managerName} · {formatDate(feedback.createdAt, 'short')}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                title="Branch Announcements & Circulars"
+                icon={<Megaphone />}
+                actions={
+                  <Link
+                    to={paths.staff.announcements}
+                    className="text-xs font-semibold text-zinc-700 hover:text-zinc-900"
+                  >
+                    View all
+                  </Link>
+                }
+              />
+              <CardBody className="space-y-3">
+                {data.announcementsList.length === 0 ? (
+                  <p className="text-xs text-zinc-500 py-3">No branch announcements posted.</p>
+                ) : (
+                  data.announcementsList.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className="rounded-lg border border-zinc-200/80 bg-zinc-50/70 p-3.5 text-xs transition-colors hover:border-zinc-300"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-zinc-900 truncate pr-2">
+                          {announcement.title}
+                        </span>
+                        <Badge tone="neutral">{announcement.category}</Badge>
+                      </div>
+                      <p className="mt-1 text-zinc-600 line-clamp-2 leading-relaxed">
+                        {announcement.body}
+                      </p>
+                      <div className="mt-2 text-[11px] text-zinc-400 font-medium">
+                        {formatDate(announcement.publishedAt ?? announcement.createdAt, 'short')}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardBody>
+            </Card>
+          </div>
+        )}
       </AsyncBoundary>
     </div>
   );

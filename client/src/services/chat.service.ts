@@ -10,6 +10,15 @@ import type { MockDb, StoredConversation } from './mock/seed';
  * Internal chat. Currently request/response with UI polling (ASSUMPTION).
  * Socket.IO live events can later be added behind this same interface (SRS §8).
  */
+export interface ChatContact {
+  id: string;
+  employeeId?: string;
+  fullName: string;
+  role: 'manager' | 'staff';
+  position: string;
+  avatarUrl?: string | null;
+}
+
 export interface ChatService {
   listConversations(): Promise<Conversation[]>;
   getMessages(conversationId: string): Promise<ChatMessage[]>;
@@ -18,6 +27,7 @@ export interface ChatService {
   deleteMessage(conversationId: string, messageId: string): Promise<void>;
   /** Find or create a direct conversation with another user. */
   startDirect(userId: string): Promise<Conversation>;
+  getContacts(): Promise<ChatContact[]>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -28,6 +38,7 @@ const httpChatService: ChatService = {
   editMessage: (convId, msgId, body) => api.patch<ChatMessage>(`/conversations/${convId}/messages/${msgId}`, { body }),
   deleteMessage: (convId, msgId) => api.delete<void>(`/conversations/${convId}/messages/${msgId}`),
   startDirect: (userId) => api.post<Conversation>('/conversations', { type: 'direct', participantId: userId }),
+  getContacts: () => api.get<ChatContact[]>('/conversations/contacts'),
 };
 
 // ---------------- Mock adapter ----------------
@@ -135,6 +146,22 @@ const mockChatService: ChatService = {
       commit();
     }
     return toDto(c, db, user.id);
+  },
+  async getContacts() {
+    await delay(100);
+    const user = requireUser();
+    const db = getDb();
+    return db.users
+      .filter((u) => u.id !== user.id && u.status === 'active')
+      .map((u) => ({
+        id: u.id,
+        employeeId: u.employeeId,
+        fullName: u.fullName,
+        role: u.role,
+        position: u.role === 'manager' ? 'Branch Manager' : (u.position || 'Staff'),
+        avatarUrl: u.avatarUrl,
+      }))
+      .sort((a, _b) => (a.role === 'manager' ? -1 : 1));
   },
 };
 

@@ -52,6 +52,7 @@ export interface RegisterRequest {
   email: string;
   phone: string;
   password: string;
+  branchName?: string;
 }
 
 export interface VerificationStatusResponse {

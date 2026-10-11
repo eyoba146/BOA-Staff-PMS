@@ -4,11 +4,18 @@ import { verifyAccessToken } from '../utils/jwt.js';
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (typeof req.query.token === 'string' && req.query.token.trim()) {
+    token = req.query.token.trim();
+  }
+
+  if (!token) {
     throw ApiError.unauthorized('Authentication required. Missing or invalid Bearer token.');
   }
 
-  const token = authHeader.split(' ')[1];
   const payload = verifyAccessToken(token);
 
   if (!payload) {

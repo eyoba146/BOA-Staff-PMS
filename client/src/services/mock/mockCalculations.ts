@@ -14,7 +14,7 @@ import { eachDay, getPeriodBounds, isSunday, parseISODate, shiftPeriod, todayISO
 import type { MockDb, StoredEntry, StoredKpi } from './seed';
 
 /**
- * ⚠ DEMONSTRATION CALCULATIONS — MOCK ADAPTER ONLY.
+ * [WARNING] DEMONSTRATION CALCULATIONS — MOCK ADAPTER ONLY.
  *
  * Simulates what the Express backend will compute. Uses the SRS §16.2 *conceptual* formula
  * (Actual ÷ Target × 100) and placeholder thresholds from settings. None of this is an
