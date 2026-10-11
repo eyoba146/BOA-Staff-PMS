@@ -75,7 +75,8 @@ export function ForgotPasswordPage() {
       });
       setStep('verify');
     } catch (err: unknown) {
-      setRequestError(toApiError(err).message);
+      const apiErr = toApiError(err);
+      setRequestError(apiErr.fieldErrors?.identifier || apiErr.message);
     } finally {
       setRequestLoading(false);
     }
@@ -191,7 +192,7 @@ export function ForgotPasswordPage() {
             {requestError && <Alert tone="danger">{requestError}</Alert>}
 
             <form onSubmit={handleRequestSubmit} noValidate className="space-y-5">
-              <Field label="Employee ID or registered email" error={requestError ? undefined : undefined} required>
+              <Field label="Employee ID or registered email" error={requestError ?? undefined} required>
                 <Input
                   autoFocus
                   name="identifier"

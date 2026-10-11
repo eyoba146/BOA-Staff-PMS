@@ -465,46 +465,46 @@ export const authService = {
   // ---------------- FEATURE 1: Password Reset ----------------
   async requestPasswordReset(identifier: string) {
     const user = await userRepository.findByIdentifier(identifier);
-    const masked = user ? maskEmail(user.email) : maskEmail(identifier.includes('@') ? identifier : `${identifier}@abyssinia.et`);
-
-    let codeRecord: { expiresAt: Date; resendAfter: Date } | undefined;
-
-    if (user) {
-      const latest = await verificationRepository.findLatest(user.email, 'password_reset');
-      const now = new Date();
-      if (latest && now < latest.resendAfter) {
-        const remainingSec = Math.ceil((latest.resendAfter.getTime() - now.getTime()) / 1000);
-        throw new ApiError({
-          status: 429,
-          code: 'RATE_LIMIT',
-          message: `Please wait ${remainingSec} second${remainingSec === 1 ? '' : 's'} before requesting a new code.`,
-        });
-      }
-
-      const code = generateVerificationCode();
-      codeRecord = await verificationRepository.createCode({
-        target: user.email,
-        code,
-        purpose: 'password_reset',
-        expiresInSeconds: 300,
-        cooldownSeconds: 60,
-      });
-
-      await sendTransactionalEmail({
-        to: user.email,
-        toName: user.fullName,
-        subject: 'Bank of Abyssinia — Password Recovery Code',
-        htmlContent: renderVerificationCodeEmail({
-          fullName: user.fullName,
-          code,
-          purpose: 'password_reset',
-        }),
+    if (!user) {
+      throw ApiError.notFound('Staff with this email is not registered yet.', 'NOT_REGISTERED', {
+        identifier: 'Staff with this email is not registered yet.',
       });
     }
 
+    const masked = maskEmail(user.email);
+    const latest = await verificationRepository.findLatest(user.email, 'password_reset');
     const now = new Date();
-    const expiresAt = codeRecord ? codeRecord.expiresAt.toISOString() : new Date(now.getTime() + 300000).toISOString();
-    const resendAfter = codeRecord ? codeRecord.resendAfter.toISOString() : new Date(now.getTime() + 60000).toISOString();
+    if (latest && now < latest.resendAfter) {
+      const remainingSec = Math.ceil((latest.resendAfter.getTime() - now.getTime()) / 1000);
+      throw new ApiError({
+        status: 429,
+        code: 'RATE_LIMIT',
+        message: `Please wait ${remainingSec} second${remainingSec === 1 ? '' : 's'} before requesting a new code.`,
+      });
+    }
+
+    const code = generateVerificationCode();
+    const codeRecord = await verificationRepository.createCode({
+      target: user.email,
+      code,
+      purpose: 'password_reset',
+      expiresInSeconds: 300,
+      cooldownSeconds: 60,
+    });
+
+    await sendTransactionalEmail({
+      to: user.email,
+      toName: user.fullName,
+      subject: 'Bank of Abyssinia — Password Recovery Code',
+      htmlContent: renderVerificationCodeEmail({
+        fullName: user.fullName,
+        code,
+        purpose: 'password_reset',
+      }),
+    });
+
+    const expiresAt = codeRecord.expiresAt.toISOString();
+    const resendAfter = codeRecord.resendAfter.toISOString();
 
     return {
       success: true,

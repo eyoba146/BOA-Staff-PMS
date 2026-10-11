@@ -304,8 +304,13 @@ const mockAuthService: AuthService = {
     const id = identifier.trim().toLowerCase();
     const user = getDb().users.find((u) => u.employeeId.toLowerCase() === id || u.email.toLowerCase() === id);
 
-    // Generic safe response to avoid account enumeration
-    const maskedEmail = user ? maskEmail(user.email) : maskEmail(id.includes('@') ? id : `${id}@abyssinia.et`);
+    if (!user) {
+      throw mockError(404, 'NOT_REGISTERED', 'Staff with this email is not registered yet.', {
+        identifier: 'Staff with this email is not registered yet.',
+      });
+    }
+
+    const maskedEmail = maskEmail(user.email);
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const key = id;
 
@@ -322,7 +327,7 @@ const mockAuthService: AuthService = {
       maskedEmail,
       expiresInSeconds: 300,
       resendCooldownSeconds: 60,
-      message: 'If an account matches the details provided, a 6-digit verification code has been sent.',
+      message: 'A 6-digit verification code has been dispatched to your registered email address.',
     };
   },
 

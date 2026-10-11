@@ -31,8 +31,8 @@ export class ApiError extends Error implements ApiErrorShape {
     return new ApiError({ status: 403, code, message });
   }
 
-  static notFound(message = 'Resource not found.', code = 'NOT_FOUND') {
-    return new ApiError({ status: 404, code, message });
+  static notFound(message = 'Resource not found.', code = 'NOT_FOUND', fieldErrors?: Record<string, string>) {
+    return new ApiError({ status: 404, code, message, fieldErrors });
   }
 
   static conflict(message: string, code = 'CONFLICT', fieldErrors?: Record<string, string>) {
