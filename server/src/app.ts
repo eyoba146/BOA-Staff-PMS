@@ -25,6 +25,9 @@ import { realtimeRoutes } from './modules/realtime/realtime.routes.js';
 
 export const app = express();
 
+// Trust reverse proxy (Render, Cloudflare, AWS ALB)
+app.set('trust proxy', 1);
+
 // Security HTTP headers
 app.use(helmet());
 

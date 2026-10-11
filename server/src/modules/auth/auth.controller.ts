@@ -15,10 +15,12 @@ export const authController = {
         ? 30 * 24 * 60 * 60 * 1000 // 30 days if remember
         : 7 * 24 * 60 * 60 * 1000;  // 7 days default
 
+      const isProd = env.NODE_ENV === 'production';
+
       res.cookie(COOKIE_NAME, result.refreshToken, {
         httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: isProd,
+        sameSite: isProd ? 'none' : 'lax',
         path: '/',
         maxAge,
       });
@@ -34,10 +36,11 @@ export const authController = {
 
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const isProd = env.NODE_ENV === 'production';
       res.clearCookie(COOKIE_NAME, {
         httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: isProd,
+        sameSite: isProd ? 'none' : 'lax',
         path: '/',
       });
       res.status(200).json({ success: true });
