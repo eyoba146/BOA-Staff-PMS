@@ -145,8 +145,8 @@ export function DailyKpiEntryPage() {
               {/* Date selection and policy bar */}
               <Card>
                 <CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <Field label="Performance Date" className="w-52">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <Field label="Performance Date" className="w-full sm:w-52">
                       <Input
                         type="date"
                         min={minDate}
@@ -156,7 +156,7 @@ export function DailyKpiEntryPage() {
                         leftIcon={<Calendar />}
                       />
                     </Field>
-                    <div className="text-xs text-zinc-500 pt-5">
+                    <div className="text-xs text-zinc-500 pt-0 sm:pt-5">
                       Backdating allowed up to {settings.entryPolicy.backdateDays} day(s).
                     </div>
                   </div>
@@ -199,16 +199,17 @@ export function DailyKpiEntryPage() {
                   </div>
 
                   {/* Sticky submit bar */}
-                  <div className="sticky bottom-4 z-20 flex items-center justify-between rounded-lg border border-zinc-200 bg-white/95 p-4 shadow-lg backdrop-blur-sm">
+                  <div className="sticky bottom-4 z-20 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-zinc-200 bg-white/95 p-3 sm:p-4 shadow-lg backdrop-blur-sm">
                     <div className="text-xs text-zinc-600">
                       Target date: <span className="font-semibold text-zinc-900">{formatDate(selectedDate)}</span>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
                       <Button
                         type="submit"
                         variant="accent"
                         size="md"
+                        className="w-full sm:w-auto"
                         leftIcon={<Save className="size-4" />}
                       >
                         {isSubmitted ? 'Review & Update' : 'Review & Submit'}

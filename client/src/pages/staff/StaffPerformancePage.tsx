@@ -43,7 +43,7 @@ export function StaffPerformancePage() {
             <PendingValidationNotice basis={summary.calculationBasis} />
 
             {/* Performance Summary Cards */}
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
               <StatCard
                 label="Overall Achievement"
                 value={formatPercent(summary.overallPercent)}

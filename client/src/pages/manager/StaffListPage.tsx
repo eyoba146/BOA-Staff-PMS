@@ -247,12 +247,12 @@ export function StaffListPage() {
                         onChange={(e) => setSearch(e.target.value)}
                       />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-zinc-500">Status:</span>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <span className="text-xs text-zinc-500 whitespace-nowrap">Status:</span>
                       <Select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="w-40"
+                        className="flex-1 sm:w-40"
                       >
                         <option value="all">All statuses</option>
                         <option value="active">Active</option>
@@ -460,19 +460,19 @@ export function StaffListPage() {
                           </div>
 
                           {/* Footer with Actions */}
-                          <div className="mt-5 flex items-center justify-between border-t border-zinc-100 pt-3.5 text-xs text-zinc-500">
+                          <div className="mt-5 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between border-t border-zinc-100 pt-3.5 text-xs text-zinc-500">
                             <span className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                               <Calendar className="size-3.5" />
                               Registered: {formatDate(staff.createdAt)}
                             </span>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
                               <Button
                                 size="sm"
                                 variant="secondary"
                                 leftIcon={<XCircle className="size-3.5 text-red-500" />}
                                 onClick={() => setRejectUser(staff)}
-                                className="text-zinc-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
+                                className="flex-1 sm:flex-initial text-zinc-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200"
                               >
                                 Decline
                               </Button>
@@ -481,7 +481,7 @@ export function StaffListPage() {
                                 variant="primary"
                                 leftIcon={<CheckCircle2 className="size-3.5" />}
                                 onClick={() => openApprove(staff)}
-                                className="font-bold shadow-xs"
+                                className="flex-1 sm:flex-initial font-bold shadow-xs"
                               >
                                 Review & Approve
                               </Button>

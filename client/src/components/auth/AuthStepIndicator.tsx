@@ -44,8 +44,8 @@ export function AuthStepIndicator({ steps, currentStepIndex, className }: AuthSt
                 </div>
                 <span
                   className={cn(
-                    'mt-2 text-center text-[11.5px] whitespace-nowrap transition-colors',
-                    isCurrent ? 'font-semibold text-zinc-950' : isCompleted ? 'font-medium text-zinc-600' : 'text-zinc-400',
+                    'mt-1.5 sm:mt-2 text-center text-[10.5px] sm:text-[11.5px] transition-colors',
+                    isCurrent ? 'font-semibold text-zinc-950 block whitespace-nowrap' : isCompleted ? 'font-medium text-zinc-600 hidden sm:block whitespace-nowrap' : 'text-zinc-400 hidden sm:block whitespace-nowrap',
                   )}
                 >
                   {step.label}
@@ -56,7 +56,7 @@ export function AuthStepIndicator({ steps, currentStepIndex, className }: AuthSt
               {index < steps.length - 1 && (
                 <div
                   className={cn(
-                    'mx-2 sm:mx-4 h-0.5 flex-1 -mt-6 transition-colors',
+                    'mx-1.5 sm:mx-4 h-0.5 flex-1 -mt-5 sm:-mt-6 transition-colors',
                     index < currentStepIndex ? 'bg-gold-500' : 'bg-zinc-200',
                   )}
                   aria-hidden

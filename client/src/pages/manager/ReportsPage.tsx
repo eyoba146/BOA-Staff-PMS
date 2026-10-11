@@ -161,6 +161,7 @@ export function ReportsPage() {
               <Button
                 variant="secondary"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={handleExportCSV}
                 disabled={!report || state.loading}
                 leftIcon={<FileText className="size-4 text-emerald-600" />}
@@ -171,6 +172,7 @@ export function ReportsPage() {
               <Button
                 variant="secondary"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={handleExportExcel}
                 disabled={!report || state.loading}
                 leftIcon={<FileSpreadsheet className="size-4 text-emerald-600" />}
@@ -181,6 +183,7 @@ export function ReportsPage() {
               <Button
                 variant="primary"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={handlePrintPDF}
                 disabled={!report || state.loading}
                 leftIcon={<Printer className="size-4 text-gold-400" />}
@@ -238,8 +241,8 @@ export function ReportsPage() {
       {/* Filter Controls (Hidden during Print)                                     */}
       {/* ========================================================================= */}
       <Card className="print:hidden">
-        <CardBody className="flex flex-wrap items-end gap-4">
-          <Field label="Cycle Period" className="w-40">
+        <CardBody className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4">
+          <Field label="Cycle Period" className="w-full sm:w-40">
             <Select
               value={period}
               onChange={(e) => setPeriod(e.target.value as PerformancePeriod)}
@@ -251,7 +254,7 @@ export function ReportsPage() {
             </Select>
           </Field>
 
-          <Field label="From Date" className="w-44">
+          <Field label="From Date" className="w-full sm:w-44">
             <Input
               type="date"
               value={fromDate}
@@ -260,7 +263,7 @@ export function ReportsPage() {
             />
           </Field>
 
-          <Field label="To Date" className="w-44">
+          <Field label="To Date" className="w-full sm:w-44">
             <Input
               type="date"
               value={toDate}
@@ -269,7 +272,7 @@ export function ReportsPage() {
             />
           </Field>
 
-          <div className="text-xs text-zinc-500 pb-2">
+          <div className="text-xs text-zinc-500 pb-0 sm:pb-2">
             Coverage Window: <span className="font-semibold text-zinc-700">{formatDate(fromDate)}</span> –{' '}
             <span className="font-semibold text-zinc-700">{formatDate(toDate)}</span>
           </div>
@@ -287,17 +290,17 @@ export function ReportsPage() {
             {/* Executive KPI Summary Cards                                               */}
             {/* ========================================================================= */}
             {summaryStats && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
                 {/* Branch Average Score */}
-                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-xs">
+                <div className="rounded-xl border border-zinc-200 bg-white p-3.5 sm:p-5 shadow-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-500">
                       Branch Average Score
                     </span>
                     <TrendingUp className="size-4 text-gold-600" />
                   </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold tracking-tight text-ink-950 tabular">
+                  <div className="mt-1.5 sm:mt-2 flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink-950 tabular">
                       {summaryStats.avgScore}%
                     </span>
                     <Badge
@@ -316,26 +319,26 @@ export function ReportsPage() {
                         : 'Review Required'}
                     </Badge>
                   </div>
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs text-zinc-500 line-clamp-1">
                     Evaluated across {summaryStats.totalStaff} staff roster members
                   </p>
                 </div>
 
                 {/* Target Attainment Rate */}
-                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-xs">
+                <div className="rounded-xl border border-zinc-200 bg-white p-3.5 sm:p-5 shadow-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-500">
                       Target Attainment
                     </span>
                     <Award className="size-4 text-emerald-600" />
                   </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold tracking-tight text-ink-950 tabular">
+                  <div className="mt-1.5 sm:mt-2 flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink-950 tabular">
                       {summaryStats.attainmentRate}%
                     </span>
-                    <span className="text-xs text-zinc-500 font-medium">meeting target</span>
+                    <span className="text-[11px] sm:text-xs text-zinc-500 font-medium">meeting target</span>
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+                  <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs text-zinc-500">
                     <span className="font-semibold text-emerald-700">
                       {summaryStats.onTargetCount} on target
                     </span>
@@ -347,39 +350,39 @@ export function ReportsPage() {
                 </div>
 
                 {/* Submission Compliance */}
-                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-xs">
+                <div className="rounded-xl border border-zinc-200 bg-white p-3.5 sm:p-5 shadow-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-500">
                       Audit Compliance
                     </span>
                     <CheckCircle2 className="size-4 text-emerald-600" />
                   </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold tracking-tight text-ink-950 tabular">
+                  <div className="mt-1.5 sm:mt-2 flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink-950 tabular">
                       {summaryStats.complianceRate}%
                     </span>
-                    <span className="text-xs text-zinc-500 font-medium">entries logged</span>
+                    <span className="text-[11px] sm:text-xs text-zinc-500 font-medium">entries logged</span>
                   </div>
-                  <p className="mt-2 text-xs text-zinc-500 tabular">
+                  <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs text-zinc-500 tabular line-clamp-1">
                     {summaryStats.totalSubmitted} submitted of {summaryStats.totalExpected} expected
                   </p>
                 </div>
 
                 {/* Active KPIs Tracked */}
-                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-xs">
+                <div className="rounded-xl border border-zinc-200 bg-white p-3.5 sm:p-5 shadow-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-zinc-500">
                       Indicators Monitored
                     </span>
                     <Target className="size-4 text-blue-600" />
                   </div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold tracking-tight text-ink-950 tabular">
+                  <div className="mt-1.5 sm:mt-2 flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-ink-950 tabular">
                       {loadedReport.byKpi.length}
                     </span>
-                    <span className="text-xs text-zinc-500 font-medium">KPIs in cycle</span>
+                    <span className="text-[11px] sm:text-xs text-zinc-500 font-medium">KPIs in cycle</span>
                   </div>
-                  <p className="mt-2 text-xs text-zinc-500">
+                  <p className="mt-1.5 sm:mt-2 text-[11px] sm:text-xs text-zinc-500 line-clamp-1">
                     {loadedReport.byKpi.filter((k) => k.status === 'on_target').length} indicators within target band
                   </p>
                 </div>

@@ -476,6 +476,7 @@ export function SettingsPage() {
                       <Button
                         type="submit"
                         variant="primary"
+                        className="w-full sm:w-auto"
                         loading={savingBranch}
                         leftIcon={<Save className="size-4" />}
                       >
@@ -529,7 +530,7 @@ export function SettingsPage() {
                         variant="primary"
                         loading={savingManagerName}
                         leftIcon={<Save className="size-3.5" />}
-                        className="sm:mb-6"
+                        className="w-full sm:w-auto sm:mb-6"
                       >
                         Update Name
                       </Button>
@@ -581,7 +582,7 @@ export function SettingsPage() {
                         variant="primary"
                         loading={requestingEmailChange}
                         leftIcon={<Mail className="size-3.5" />}
-                        className="sm:mb-6"
+                        className="w-full sm:w-auto sm:mb-6"
                       >
                         Send Verification Code
                       </Button>
@@ -636,7 +637,7 @@ export function SettingsPage() {
                     </div>
 
                     <div className="flex justify-end pt-2">
-                      <Button type="submit" variant="primary" loading={savingThresholds}>
+                      <Button type="submit" variant="primary" className="w-full sm:w-auto" loading={savingThresholds}>
                         Save Thresholds
                       </Button>
                     </div>
@@ -687,7 +688,7 @@ export function SettingsPage() {
                     </Field>
 
                     <div className="flex justify-end pt-2">
-                      <Button type="submit" variant="primary" loading={savingPolicy}>
+                      <Button type="submit" variant="primary" className="w-full sm:w-auto" loading={savingPolicy}>
                         Save Policy Settings
                       </Button>
                     </div>
@@ -733,7 +734,7 @@ export function SettingsPage() {
                     </div>
 
                     <div className="flex justify-end pt-2">
-                      <Button type="submit" variant="secondary" loading={savingPassword}>
+                      <Button type="submit" variant="secondary" className="w-full sm:w-auto" loading={savingPassword}>
                         Update Password
                       </Button>
                     </div>
@@ -790,6 +791,7 @@ export function SettingsPage() {
                   <>
                     <Button
                       variant="secondary"
+                      className="w-full sm:w-auto"
                       onClick={() => setEmailChangeModalOpen(false)}
                       disabled={verifyingCode}
                     >
@@ -797,6 +799,7 @@ export function SettingsPage() {
                     </Button>
                     <Button
                       variant="primary"
+                      className="w-full sm:w-auto"
                       onClick={handleVerifyEmailChange}
                       loading={verifyingCode}
                       disabled={verificationCode.trim().length !== 6 || emailTimer.isExpired}

@@ -42,18 +42,18 @@ export function ManagerDashboardPage() {
         documentTitle="Branch Dashboard"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Link to={paths.manager.announcements}>
-              <Button variant="primary" size="sm" leftIcon={<Megaphone className="size-3.5" />}>
+            <Link to={paths.manager.announcements} className="w-full sm:w-auto">
+              <Button variant="primary" size="sm" className="w-full sm:w-auto" leftIcon={<Megaphone className="size-3.5" />}>
                 Post Announcement
               </Button>
             </Link>
-            <Link to={paths.manager.performance}>
-              <Button variant="secondary" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
+            <Link to={paths.manager.performance} className="w-full sm:w-auto">
+              <Button variant="secondary" size="sm" className="w-full sm:w-auto" rightIcon={<ArrowRight className="size-3.5" />}>
                 Detailed Monitoring
               </Button>
             </Link>
-            <Link to={paths.manager.kpis}>
-              <Button variant="secondary" size="sm" leftIcon={<Target className="size-3.5" />}>
+            <Link to={paths.manager.kpis} className="w-full sm:w-auto">
+              <Button variant="secondary" size="sm" className="w-full sm:w-auto" leftIcon={<Target className="size-3.5" />}>
                 Manage KPIs
               </Button>
             </Link>
@@ -80,7 +80,7 @@ export function ManagerDashboardPage() {
               <PendingValidationNotice basis={overview.calculationBasis} />
 
               {/* Top Stats Grid */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
                 <StatCard
                   label="Branch Average"
                   value={formatPercent(overview.averagePercent)}

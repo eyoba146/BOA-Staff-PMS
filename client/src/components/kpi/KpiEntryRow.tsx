@@ -72,8 +72,8 @@ export function KpiEntryRow({
         </div>
 
         {/* Right: Actual Input + Preview */}
-        <div className="flex flex-wrap items-center gap-3 md:w-80 md:justify-end">
-          <div className="w-36">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full md:w-80 pt-2 sm:pt-0 border-t border-zinc-100 md:border-0">
+          <div className="flex-1 sm:w-36 sm:flex-none">
             <Input
               type="number"
               step={kpi.valueType === 'decimal' ? '0.01' : '1'}
@@ -89,8 +89,8 @@ export function KpiEntryRow({
           </div>
 
           {/* Demonstration Preview % */}
-          <div className="w-24 text-right">
-            <span className="block text-[11px] text-zinc-400">Preview %</span>
+          <div className="shrink-0 text-right min-w-[64px] sm:w-24">
+            <span className="block text-[10.5px] sm:text-[11px] text-zinc-400">Preview %</span>
             <span
               className={cn(
                 'text-sm font-semibold tabular',
@@ -112,7 +112,7 @@ export function KpiEntryRow({
             type="button"
             onClick={() => setShowNote(!showNote)}
             className={cn(
-              'flex size-9 items-center justify-center rounded-md border transition-colors',
+              'shrink-0 flex size-9 items-center justify-center rounded-md border transition-colors',
               showNote || note
                 ? 'border-zinc-300 bg-zinc-100 text-zinc-900'
                 : 'border-zinc-200 bg-white text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50',

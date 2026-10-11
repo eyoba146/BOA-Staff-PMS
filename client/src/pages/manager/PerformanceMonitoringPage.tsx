@@ -63,7 +63,7 @@ export function PerformanceMonitoringPage() {
               <PendingValidationNotice basis={overview.calculationBasis} />
 
               {/* Summary Strip */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
                 <StatCard
                   label="Branch Average Score"
                   value={formatPercent(overview.averagePercent)}
@@ -103,12 +103,12 @@ export function PerformanceMonitoringPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">Filter Status:</span>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <span className="text-xs text-zinc-500 whitespace-nowrap">Filter Status:</span>
                   <Select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-44"
+                    className="flex-1 sm:w-44"
                   >
                     <option value="all">All statuses</option>
                     <option value="on_target">On Target</option>

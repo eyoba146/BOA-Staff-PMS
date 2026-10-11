@@ -144,10 +144,11 @@ export function StaffDashboardPage() {
                 </p>
               </div>
             </div>
-            <Link to={paths.staff.kpiEntry} className="shrink-0">
+            <Link to={paths.staff.kpiEntry} className="w-full sm:w-auto shrink-0">
               <Button
                 variant={supportingData.isTodayComplete ? 'secondary' : 'accent'}
                 size="md"
+                className="w-full sm:w-auto"
                 leftIcon={<ClipboardPenLine className="size-4" />}
                 rightIcon={<ArrowRight className="size-4" />}
               >
@@ -165,7 +166,7 @@ export function StaffDashboardPage() {
             <PendingValidationNotice basis={summary.calculationBasis} />
 
             {/* Stat Row: Overall %, Status, Entries Submitted/Expected, Unread Feedback */}
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
               <StatCard
                 label="Overall Achievement"
                 value={formatPercent(summary.overallPercent)}

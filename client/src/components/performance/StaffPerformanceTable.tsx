@@ -21,7 +21,7 @@ export function StaffPerformanceTable({ rows }: StaffPerformanceTableProps) {
           <TH hideBelow="md">Position</TH>
           <TH hideBelow="sm" className="w-36">Overall Progress</TH>
           <TH align="right">Performance %</TH>
-          <TH align="center">Entries</TH>
+          <TH hideBelow="sm" align="center">Entries</TH>
           <TH align="center">Status</TH>
         </TR>
       </THead>
@@ -49,7 +49,7 @@ export function StaffPerformanceTable({ rows }: StaffPerformanceTableProps) {
             <TD align="right" className="font-semibold text-zinc-900 tabular">
               {formatPercent(row.overallPercent)}
             </TD>
-            <TD align="center" className="text-xs text-zinc-500 tabular">
+            <TD hideBelow="sm" align="center" className="text-xs text-zinc-500 tabular">
               {row.entriesSubmitted} / {row.entriesExpected}
             </TD>
             <TD align="center">

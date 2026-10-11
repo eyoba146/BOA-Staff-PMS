@@ -131,6 +131,7 @@ export function KpiManagementPage() {
           <Button
             variant="primary"
             size="sm"
+            className="w-full sm:w-auto"
             leftIcon={<Plus className="size-4" />}
             onClick={handleOpenCreate}
           >
@@ -208,10 +209,10 @@ export function KpiManagementPage() {
                       <TR>
                         <TH>Indicator Name</TH>
                         <TH align="right">Target</TH>
-                        <TH align="center">Frequency</TH>
+                        <TH hideBelow="sm" align="center">Frequency</TH>
                         <TH hideBelow="md" align="center">Weight</TH>
-                        <TH align="center">Assigned</TH>
-                        <TH align="center">Rule Status</TH>
+                        <TH hideBelow="md" align="center">Assigned</TH>
+                        <TH hideBelow="lg" align="center">Rule Status</TH>
                         <TH align="center">Status</TH>
                         <TH align="right">Actions</TH>
                       </TR>
@@ -228,7 +229,7 @@ export function KpiManagementPage() {
                           <TD align="right" className="font-medium text-zinc-900">
                             {formatNumber(kpi.target)} <span className="text-xs text-zinc-400 font-normal">{kpi.unit}</span>
                           </TD>
-                          <TD align="center">
+                          <TD hideBelow="sm" align="center">
                             <span className="capitalize text-xs text-zinc-700 font-medium">
                               {kpi.frequency}
                             </span>
@@ -236,7 +237,7 @@ export function KpiManagementPage() {
                           <TD hideBelow="md" align="center" className="text-xs text-zinc-500">
                             {kpi.weight !== null ? `${kpi.weight}%` : '—'}
                           </TD>
-                          <TD align="center">
+                          <TD hideBelow="md" align="center">
                             <button
                               type="button"
                               onClick={() => handleOpenAssign(kpi)}
@@ -247,7 +248,7 @@ export function KpiManagementPage() {
                               {kpi.assignedStaffCount} staff
                             </button>
                           </TD>
-                          <TD align="center">
+                          <TD hideBelow="lg" align="center">
                             {kpi.ruleStatus === 'approved' ? (
                               <Badge tone="success">Approved</Badge>
                             ) : (

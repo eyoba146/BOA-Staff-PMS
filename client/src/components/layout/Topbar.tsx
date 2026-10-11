@@ -14,8 +14,8 @@ export function Topbar({ onOpenMenu, counts }: { onOpenMenu: () => void; counts:
   const unread = counts.unreadAnnouncements ?? 0;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-zinc-200 bg-white/95 px-4 backdrop-blur-sm sm:px-6 lg:px-8">
-      <IconButton label="Open navigation menu" onClick={onOpenMenu} className="-ml-2 lg:hidden">
+    <header className="sticky top-0 z-30 flex h-14 sm:h-16 items-center gap-2 sm:gap-3 border-b border-zinc-200 bg-white/95 px-3 sm:px-6 lg:px-8 backdrop-blur-sm">
+      <IconButton label="Open navigation menu" onClick={onOpenMenu} className="-ml-1 sm:-ml-2 lg:hidden">
         <Menu className="size-5" />
       </IconButton>
 
@@ -92,7 +92,7 @@ function UserMenu() {
         <ChevronDown className="hidden size-4 text-zinc-400 sm:block" aria-hidden />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 mt-2 w-60 animate-fade-in rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
+        <div role="menu" className="absolute right-0 mt-2 w-60 max-w-[calc(100vw-1.5rem)] animate-fade-in rounded-lg border border-zinc-200 bg-white py-1 shadow-lg">
           <div className="border-b border-zinc-100 px-3.5 py-2.5">
             <p className="truncate text-sm font-medium text-zinc-900">{user.fullName}</p>
             <p className="truncate text-xs text-zinc-500">

@@ -151,7 +151,7 @@ export function ForgotPasswordPage() {
         </div>
       }
     >
-      <div className="relative overflow-hidden rounded-2xl border border-zinc-200/90 bg-white p-7 sm:p-10 shadow-[0_20px_60px_-15px_rgba(14,14,16,0.07),0_2px_8px_rgba(14,14,16,0.04)]">
+      <div className="relative overflow-hidden rounded-2xl border border-zinc-200/90 bg-white p-5 sm:p-8 md:p-10 shadow-[0_20px_60px_-15px_rgba(14,14,16,0.07),0_2px_8px_rgba(14,14,16,0.04)]">
         {/* Top Gold Gradient Brand Accent Ribbon */}
         <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-gold-600 via-gold-400 to-gold-500" />
 
@@ -159,12 +159,12 @@ export function ForgotPasswordPage() {
         <div className="pointer-events-none absolute -top-20 -right-20 size-48 rounded-full bg-gold-400/10 blur-3xl" />
 
         {/* Integrated Card Header */}
-        <div className="relative flex items-center justify-between border-b border-zinc-100 pb-5">
-          <div className="flex items-center gap-3.5">
-            <img src="/abyssinia-logo.png" alt="Bank of Abyssinia" className="h-12 w-auto shrink-0 object-contain" />
+        <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 pb-4 sm:pb-5">
+          <div className="flex items-center gap-3 sm:gap-3.5">
+            <img src="/abyssinia-logo.png" alt="Bank of Abyssinia" className="h-10 sm:h-12 w-auto shrink-0 object-contain" />
             <div>
-              <p className="text-[11.5px] font-bold tracking-wider text-zinc-400 uppercase">Bank of Abyssinia</p>
-              <p className="text-[14.5px] font-semibold text-zinc-900">Staff Account Recovery</p>
+              <p className="text-[11px] sm:text-[11.5px] font-bold tracking-wider text-zinc-400 uppercase">Bank of Abyssinia</p>
+              <p className="text-xs sm:text-[14.5px] font-semibold text-zinc-900">Staff Account Recovery</p>
             </div>
           </div>
 
@@ -175,7 +175,7 @@ export function ForgotPasswordPage() {
         </div>
 
         {/* Step Progress Indicator */}
-        <div className="my-6">
+        <div className="my-5 sm:my-6">
           <AuthStepIndicator steps={STEPS} currentStepIndex={currentStepIndex} />
         </div>
 
@@ -183,8 +183,8 @@ export function ForgotPasswordPage() {
         {step === 'request' && (
           <div className="space-y-5">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-950 sm:text-[25px]">Reset your password</h1>
-              <p className="mt-1 text-[13.5px] text-zinc-500 leading-relaxed">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-950 sm:text-[25px]">Reset your password</h1>
+              <p className="mt-1 text-xs sm:text-[13.5px] text-zinc-500 leading-relaxed">
                 Enter your official Employee ID or registered email address. A 6-digit verification code will be sent to confirm your identity.
               </p>
             </div>

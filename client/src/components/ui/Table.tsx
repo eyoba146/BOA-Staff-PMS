@@ -46,7 +46,7 @@ export function TH({ align = 'left', hideBelow, className, ...rest }: ThHTMLAttr
     <th
       scope="col"
       className={cn(
-        'px-4 py-2.5 text-xs font-medium whitespace-nowrap text-zinc-500 first:pl-4 sm:first:pl-5 last:pr-4 sm:last:pr-5',
+        'px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs font-medium whitespace-nowrap text-zinc-500 first:pl-3 sm:first:pl-5 last:pr-3 sm:last:pr-5',
         ALIGN[align],
         hideBelow && HIDE[hideBelow],
         className,
@@ -60,7 +60,7 @@ export function TD({ align = 'left', hideBelow, className, ...rest }: TdHTMLAttr
   return (
     <td
       className={cn(
-        'px-4 py-3 align-middle text-zinc-700 first:pl-4 sm:first:pl-5 last:pr-4 sm:last:pr-5',
+        'px-2.5 sm:px-4 py-2 sm:py-3 align-middle text-xs sm:text-sm text-zinc-700 first:pl-3 sm:first:pl-5 last:pr-3 sm:last:pr-5',
         ALIGN[align],
         align === 'right' && 'tabular',
         hideBelow && HIDE[hideBelow],

@@ -90,7 +90,7 @@ export function SegmentedControl<T extends string>({ items, value, onChange, lab
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(item.value)}
             className={cn(
-              'h-7 flex-1 rounded px-3 text-[13px] font-medium whitespace-nowrap transition-colors',
+              'h-7 flex-1 rounded px-2 sm:px-3 text-xs sm:text-[13px] font-medium whitespace-nowrap transition-colors',
               selected ? 'bg-white text-zinc-900 shadow-xs ring-1 ring-zinc-200' : 'text-zinc-600 hover:text-zinc-900',
             )}
           >

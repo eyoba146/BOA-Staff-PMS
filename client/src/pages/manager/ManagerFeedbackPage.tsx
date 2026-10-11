@@ -54,6 +54,7 @@ export function ManagerFeedbackPage() {
           <Button
             variant="primary"
             size="sm"
+            className="w-full sm:w-auto"
             leftIcon={<Plus className="size-4" />}
             onClick={() => setGiveDialogOpen(true)}
           >
@@ -86,12 +87,12 @@ export function ManagerFeedbackPage() {
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">Filter Staff:</span>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <span className="text-xs text-zinc-500 whitespace-nowrap">Filter Staff:</span>
                   <Select
                     value={selectedStaffId}
                     onChange={(e) => setSelectedStaffId(e.target.value)}
-                    className="w-52"
+                    className="flex-1 sm:w-52"
                   >
                     <option value="all">All staff members</option>
                     {staffList.map((s) => (

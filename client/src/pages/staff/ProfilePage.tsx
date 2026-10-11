@@ -362,7 +362,7 @@ export function ProfilePage() {
                   required
                   hint="Ethiopian format: e.g. 0911 234 567 or +251 91 123 4567 (10 digits for 09/07, or +251 with 9 digits)"
                 >
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1">
                       <PhoneInput
                         value={contactPhone}
@@ -374,6 +374,7 @@ export function ProfilePage() {
                       type="submit"
                       variant="primary"
                       size="md"
+                      className="w-full sm:w-auto"
                       loading={savingPhone}
                       disabled={contactPhone === user.phone}
                     >
@@ -426,6 +427,7 @@ export function ProfilePage() {
                     <Button
                       type="submit"
                       variant="secondary"
+                      className="w-full sm:w-auto"
                       loading={requestingEmailChange}
                       disabled={!newEmail.trim() || newEmail.trim().toLowerCase() === user.email.toLowerCase()}
                       rightIcon={<ArrowRight className="size-4" />}
@@ -482,7 +484,7 @@ export function ProfilePage() {
                 </div>
 
                 <div className="flex justify-end pt-2">
-                  <Button type="submit" variant="secondary" loading={savingPassword}>
+                  <Button type="submit" variant="secondary" className="w-full sm:w-auto" loading={savingPassword}>
                     Update Password
                   </Button>
                 </div>
@@ -549,7 +551,7 @@ export function ProfilePage() {
             <p className="text-xs text-red-600 font-medium">{verifyModalError}</p>
           )}
 
-          <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between pt-2 border-t border-zinc-100">
             <button
               type="button"
               onClick={handleResendCode}
@@ -566,11 +568,12 @@ export function ProfilePage() {
                 : `Resend available in ${emailTimer.resendRemaining}s`}
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="flex-1 sm:flex-initial"
                 onClick={() => {
                   setEmailModalOpen(false);
                   setVerificationCode('');
@@ -584,6 +587,7 @@ export function ProfilePage() {
                 type="submit"
                 variant="primary"
                 size="sm"
+                className="flex-1 sm:flex-initial"
                 loading={verifyingEmail}
                 disabled={verificationCode.length !== 6 || emailTimer.isExpired}
                 leftIcon={<CheckCircle2 className="size-4" />}

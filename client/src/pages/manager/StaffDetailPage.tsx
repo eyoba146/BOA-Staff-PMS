@@ -156,10 +156,11 @@ export function StaffDetailPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                   <Button
                     variant="primary"
                     size="sm"
+                    className="flex-1 sm:flex-initial"
                     leftIcon={<MessageSquareText className="size-4" />}
                     onClick={() => setFeedbackDialogOpen(true)}
                   >
@@ -168,6 +169,7 @@ export function StaffDetailPage() {
                   <Button
                     variant={isActive ? 'danger' : 'secondary'}
                     size="sm"
+                    className="flex-1 sm:flex-initial"
                     leftIcon={isActive ? <UserX className="size-4" /> : <UserCheck className="size-4" />}
                     onClick={() => setStatusConfirmOpen(true)}
                   >
@@ -188,7 +190,7 @@ export function StaffDetailPage() {
               <PendingValidationNotice basis={summary.calculationBasis} />
 
               {/* Summary Stats Row */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 [&>*:last-child]:col-span-2 lg:[&>*:last-child]:col-span-1">
                 <StatCard
                   label="Overall Performance"
                   value={formatPercent(summary.overallPercent)}

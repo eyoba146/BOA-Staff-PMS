@@ -68,6 +68,7 @@ export function ManagerAnnouncementsPage() {
           <Button
             variant="primary"
             size="sm"
+            className="w-full sm:w-auto"
             leftIcon={<Plus className="size-4" />}
             onClick={handleOpenCreate}
           >
@@ -92,11 +93,11 @@ export function ManagerAnnouncementsPage() {
           return (
             <div className="space-y-6">
               {/* Tabs */}
-              <div className="flex border-b border-zinc-200">
+              <div className="flex border-b border-zinc-200 overflow-x-auto scrollbar-thin">
                 <button
                   type="button"
                   onClick={() => setActiveTab('published')}
-                  className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 border-b-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm whitespace-nowrap font-medium transition-colors ${
                     activeTab === 'published'
                       ? 'border-ink-900 text-ink-900'
                       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
@@ -108,7 +109,7 @@ export function ManagerAnnouncementsPage() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('draft')}
-                  className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 border-b-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm whitespace-nowrap font-medium transition-colors ${
                     activeTab === 'draft'
                       ? 'border-ink-900 text-ink-900'
                       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
@@ -120,7 +121,7 @@ export function ManagerAnnouncementsPage() {
                 <button
                   type="button"
                   onClick={() => setActiveTab('archived')}
-                  className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 border-b-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm whitespace-nowrap font-medium transition-colors ${
                     activeTab === 'archived'
                       ? 'border-ink-900 text-ink-900'
                       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'

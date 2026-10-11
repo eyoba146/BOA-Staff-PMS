@@ -94,7 +94,7 @@ export function AuthLayout({ title, description, children, footer, wide }: AuthL
       </aside>
 
       {/* Right Form Main Area (50% on desktop) */}
-      <main className="flex flex-1 items-start justify-center px-4 py-8 sm:items-center sm:px-8 sm:py-12 lg:w-1/2 lg:flex-none lg:min-h-dvh bg-gradient-to-br from-zinc-50 via-canvas/60 to-zinc-100/80 relative">
+      <main className="flex flex-1 items-start justify-center px-3 py-6 sm:items-center sm:px-8 sm:py-12 lg:w-1/2 lg:flex-none lg:min-h-dvh bg-gradient-to-br from-zinc-50 via-canvas/60 to-zinc-100/80 relative">
         <div className={wide ? 'w-full max-w-2xl' : 'w-full max-w-[540px]'}>
           {/* Header (optional if page embeds its own header inside the card) */}
           {title && (

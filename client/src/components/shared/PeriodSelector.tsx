@@ -33,11 +33,11 @@ export function PeriodSelector({ period, date, onChange, className }: PeriodSele
         items={PERIODS.map((p) => ({ value: p, label: PERIOD_LABELS[p] }))}
         className="w-full sm:w-auto"
       />
-      <div className="flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-1">
+      <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-1 rounded-md border border-zinc-200 bg-white px-1">
         <IconButton label={`Previous ${period} period`} size="sm" onClick={() => go(-1)}>
           <ChevronLeft className="size-4" />
         </IconButton>
-        <span className="min-w-36 flex-1 text-center text-[13px] font-medium text-zinc-800 tabular" aria-live="polite">
+        <span className="min-w-28 sm:min-w-36 flex-1 text-center text-xs sm:text-[13px] font-medium text-zinc-800 tabular" aria-live="polite">
           {bounds.label}
         </span>
         <IconButton label={`Next ${period} period`} size="sm" onClick={() => go(1)} disabled={isCurrent} className="disabled:opacity-30">

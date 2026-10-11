@@ -63,7 +63,7 @@ export function AppLayout() {
         <div className="print:hidden">
           <Topbar onOpenMenu={() => setDrawerOpen(true)} counts={counts} />
         </div>
-        <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8 print:p-0 print:overflow-visible">
+        <main id="main" tabIndex={-1} className="flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 outline-none print:p-0 print:overflow-visible">
           <div className="mx-auto w-full max-w-[1440px] print:max-w-none">
             <Outlet />
           </div>

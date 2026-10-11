@@ -57,7 +57,7 @@ export function KpiHistoryPage() {
             </Select>
           </Field>
           <div>
-            <Button variant="ghost" size="md" onClick={resetFilters} leftIcon={<FilterX className="size-4" />}>
+            <Button variant="ghost" size="md" className="w-full sm:w-auto" onClick={resetFilters} leftIcon={<FilterX className="size-4" />}>
               Reset Filters
             </Button>
           </div>
@@ -79,7 +79,7 @@ export function KpiHistoryPage() {
                   <TR>
                     <TH>Date</TH>
                     <TH>KPI Name</TH>
-                    <TH align="right">Target</TH>
+                    <TH hideBelow="sm" align="right">Target</TH>
                     <TH align="right">Actual</TH>
                     <TH align="right">Achievement %</TH>
                     <TH align="center">Status</TH>
@@ -96,7 +96,7 @@ export function KpiHistoryPage() {
                         <span className="font-semibold text-zinc-900">{entry.kpiName}</span>
                         <span className="text-xs text-zinc-400 block">{entry.unit}</span>
                       </TD>
-                      <TD align="right" className="font-medium">
+                      <TD hideBelow="sm" align="right" className="font-medium">
                         {formatNumber(entry.target)} {entry.unit}
                       </TD>
                       <TD align="right" className="font-semibold text-zinc-900">

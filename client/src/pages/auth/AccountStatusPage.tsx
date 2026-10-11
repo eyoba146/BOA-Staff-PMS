@@ -129,7 +129,7 @@ export function AccountStatusPage() {
         </Alert>
       )}
 
-      <form onSubmit={onSubmit} noValidate className="flex items-end gap-2 rounded-lg border border-zinc-200 bg-white p-4 shadow-card">
+      <form onSubmit={onSubmit} noValidate className="flex flex-col sm:flex-row sm:items-end gap-3 rounded-lg border border-zinc-200 bg-white p-4 shadow-card">
         <Field label="Reference ID, Email, or Employee ID" error={error ?? undefined} className="flex-1">
           <Input
             leftIcon={<IdCard />}
@@ -138,7 +138,12 @@ export function AccountStatusPage() {
             placeholder="e.g. REG-123456, staff@example.com, or BOA-S009"
           />
         </Field>
-        <Button type="submit" loading={loading} leftIcon={<Search className="size-4" />} className={error ? 'mb-[26px]' : undefined}>
+        <Button
+          type="submit"
+          loading={loading}
+          leftIcon={<Search className="size-4" />}
+          className={cn('w-full sm:w-auto', error ? 'sm:mb-[26px]' : undefined)}
+        >
           Check
         </Button>
       </form>

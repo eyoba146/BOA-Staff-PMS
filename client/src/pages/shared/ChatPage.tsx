@@ -345,7 +345,7 @@ export function ChatPage() {
   );
 
   return (
-    <div className="flex h-[calc(100dvh-7.5rem)] flex-col space-y-3">
+    <div className="flex h-[calc(100dvh-8rem)] sm:h-[calc(100dvh-7.5rem)] flex-col space-y-2 sm:space-y-3">
       <PageHeader
         title="Branch Chat"
         description="Internal branch room and direct messaging for staff coordination and operational inquiries."
@@ -692,7 +692,7 @@ export function ChatPage() {
                             {/* Message Bubble */}
                             <div
                               className={cn(
-                                'max-w-[80%] rounded-lg px-3.5 py-2 text-xs leading-relaxed shadow-xs transition-all',
+                                'max-w-[85%] sm:max-w-[80%] rounded-lg px-3.5 py-2 text-xs leading-relaxed shadow-xs transition-all',
                                 isMe
                                   ? cn(
                                     'bg-ink-900 text-white rounded-br-none',
@@ -733,14 +733,14 @@ export function ChatPage() {
               </div>
 
               {/* Message Composer */}
-              <div className="border-t border-zinc-200 p-3 bg-zinc-50/70">
+              <div className="border-t border-zinc-200 p-2.5 sm:p-3 bg-zinc-50/70">
                 <div className="flex items-end gap-2">
                   <textarea
                     rows={2}
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type your message... (Enter to send, Shift+Enter for newline)"
+                    placeholder="Type your message..."
                     className="flex-1 resize-none rounded-md border border-zinc-300 bg-white p-2.5 text-xs text-zinc-900 placeholder-zinc-400 focus:border-ink-900 focus:outline-none focus:ring-1 focus:ring-ink-900"
                   />
                   <Button

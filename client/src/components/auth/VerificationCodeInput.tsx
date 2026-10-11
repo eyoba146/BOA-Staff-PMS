@@ -93,13 +93,13 @@ export function VerificationCodeInput({
   };
 
   return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3" role="group" aria-label="6-digit verification code">
+    <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 md:gap-3" role="group" aria-label="6-digit verification code">
       {Array.from({ length }).map((_, index) => {
         const val = digits[index];
         const isMiddle = index === Math.floor(length / 2) - 1;
 
         return (
-          <div key={index} className="flex items-center gap-2 sm:gap-3">
+          <div key={index} className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3">
             <input
               ref={(el) => {
                 inputsRef.current[index] = el;
@@ -119,7 +119,7 @@ export function VerificationCodeInput({
               onFocus={(e) => e.target.select()}
               aria-label={`Digit ${index + 1} of ${length}`}
               className={cn(
-                'size-11 sm:size-13 rounded-xl border text-center font-mono text-xl sm:text-2xl font-bold transition-all outline-none',
+                'size-9 sm:size-11 md:size-13 rounded-lg sm:rounded-xl border text-center font-mono text-lg sm:text-xl md:text-2xl font-bold transition-all outline-none',
                 isExpired
                   ? 'border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed'
                   : hasError
@@ -130,7 +130,7 @@ export function VerificationCodeInput({
               )}
             />
             {isMiddle && (
-              <span className="hidden sm:inline-block h-1 w-2 rounded-full bg-zinc-300" aria-hidden />
+              <span className="hidden md:inline-block h-1 w-2 rounded-full bg-zinc-300" aria-hidden />
             )}
           </div>
         );

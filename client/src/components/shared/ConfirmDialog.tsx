@@ -25,10 +25,10 @@ export function ConfirmDialog({ open, title, description, confirmLabel, onConfir
       busy={loading}
       footer={
         <>
-          <Button variant="secondary" onClick={onCancel} disabled={loading}>
+          <Button variant="secondary" onClick={onCancel} disabled={loading} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button variant={destructive ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>
+          <Button variant={destructive ? 'danger' : 'primary'} onClick={onConfirm} loading={loading} className="w-full sm:w-auto">
             {confirmLabel}
           </Button>
         </>
