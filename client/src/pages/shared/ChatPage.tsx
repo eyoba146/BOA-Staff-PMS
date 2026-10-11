@@ -71,6 +71,18 @@ export function ChatPage() {
     }
   }, [convsState.data, activeConvId]);
 
+  const activeConvIdRef = useRef(activeConvId);
+  useEffect(() => {
+    activeConvIdRef.current = activeConvId;
+  }, [activeConvId]);
+
+  const setConvsDataRef = useRef(convsState.setData);
+  useEffect(() => {
+    setConvsDataRef.current = convsState.setData;
+  }, [convsState.setData]);
+
+  const isSendingRef = useRef(false);
+
   // Load messages when active conversation changes
   useEffect(() => {
     if (!activeConvId) return;
@@ -80,7 +92,13 @@ export function ChatPage() {
     setEditingText('');
     void chatService.getMessages(activeConvId).then((res) => {
       if (!cancelled) {
-        setMessages(res);
+        const seen = new Set<string>();
+        const unique = res.filter((m) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+        setMessages(unique);
         setLoadingMessages(false);
       }
     });
@@ -97,17 +115,17 @@ export function ChatPage() {
   // Real-time SSE Live Message Listener (no polling!)
   useEffect(() => {
     const unsubMsg = realtimeService.on('chat_message', (newMsg: ChatMessage) => {
-      if (newMsg.conversationId === activeConvId) {
+      if (newMsg.conversationId === activeConvIdRef.current) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
       }
 
-      convsState.setData((prev) =>
+      setConvsDataRef.current((prev) =>
         prev?.map((c) => {
           if (c.id === newMsg.conversationId) {
-            const isCurrentlyActive = c.id === activeConvId;
+            const isCurrentlyActive = c.id === activeConvIdRef.current;
             return {
               ...c,
               lastMessage: newMsg,
@@ -121,12 +139,12 @@ export function ChatPage() {
     });
 
     const unsubEdit = realtimeService.on('chat_message_updated', (updatedMsg: ChatMessage) => {
-      if (updatedMsg.conversationId === activeConvId) {
+      if (updatedMsg.conversationId === activeConvIdRef.current) {
         setMessages((prev) =>
           prev.map((m) => (m.id === updatedMsg.id ? updatedMsg : m)),
         );
       }
-      convsState.setData((prev) =>
+      setConvsDataRef.current((prev) =>
         prev?.map((c) => {
           if (c.id === updatedMsg.conversationId && c.lastMessage?.id === updatedMsg.id) {
             return { ...c, lastMessage: updatedMsg };
@@ -139,7 +157,7 @@ export function ChatPage() {
     const unsubDel = realtimeService.on(
       'chat_message_deleted',
       ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
-        if (conversationId === activeConvId) {
+        if (conversationId === activeConvIdRef.current) {
           setMessages((prev) => prev.filter((m) => m.id !== messageId));
         }
       },
@@ -150,19 +168,23 @@ export function ChatPage() {
       unsubEdit();
       unsubDel();
     };
-  }, [activeConvId, convsState]);
+  }, []);
 
   const activeConversation = convsState.data?.find((c) => c.id === activeConvId);
 
   const handleSendMessage = async () => {
-    if (!activeConvId || !messageText.trim() || sending) return;
+    if (!activeConvId || !messageText.trim() || isSendingRef.current || sending) return;
     const body = messageText.trim();
+    isSendingRef.current = true;
     setMessageText('');
     setSending(true);
 
     try {
       const newMsg = await chatService.sendMessage(activeConvId, body);
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
 
       // update conversation snippet
       convsState.setData((prev) =>
@@ -179,6 +201,7 @@ export function ChatPage() {
     } catch {
       showToast({ tone: 'danger', title: 'Failed to send', message: 'Could not deliver your message.' });
     } finally {
+      isSendingRef.current = false;
       setSending(false);
     }
   };
@@ -251,7 +274,9 @@ export function ChatPage() {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      void handleSendMessage();
+      if (!isSendingRef.current && !sending) {
+        void handleSendMessage();
+      }
     }
   };
 
