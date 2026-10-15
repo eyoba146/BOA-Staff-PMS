@@ -18,6 +18,8 @@ import {
   XCircle,
   FileBadge,
   Trash2,
+  UserPlus,
+  RotateCcw,
 } from 'lucide-react';
 import { staffService } from '@/services/staff.service';
 import { useAsync } from '@/hooks/useAsync';
@@ -55,6 +57,7 @@ export function StaffListPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [pendingSearch, setPendingSearch] = useState('');
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
+  const [copiedRegister, setCopiedRegister] = useState(false);
 
   // Sync tab with URL search parameter
   useEffect(() => {
@@ -188,6 +191,18 @@ export function StaffListPage() {
     setTimeout(() => setCopiedRef(null), 2000);
   };
 
+  const copyRegistrationLink = () => {
+    const regUrl = `${window.location.origin}${paths.register}`;
+    navigator.clipboard?.writeText(regUrl);
+    setCopiedRegister(true);
+    showToast({
+      tone: 'success',
+      title: 'Link copied',
+      message: 'Staff self-registration link copied to clipboard.',
+    });
+    setTimeout(() => setCopiedRegister(false), 3000);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -288,11 +303,124 @@ export function StaffListPage() {
                     </div>
                   </div>
 
-                  {/* Staff Table */}
-                  <Card>
-                    {filteredStaff.length === 0 ? (
-                      <p className="p-8 text-center text-xs text-zinc-500">No staff members match the selected criteria.</p>
-                    ) : (
+                  {/* Staff Table / 10x Empty States */}
+                  {allStaff.length === 0 ? (
+                    <div className="relative overflow-hidden rounded-2xl border border-zinc-200/90 bg-white p-7 sm:p-12 text-center shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                      {/* Top Gold Gradient Brand Accent Ribbon */}
+                      <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-gold-600 via-gold-400 to-gold-500" />
+                      {/* Ambient Top Glow */}
+                      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 size-80 rounded-full bg-gold-400/10 blur-3xl" />
+
+                      <div className="relative z-10 flex flex-col items-center max-w-xl mx-auto">
+                        {/* 10x Layered BoA Icon Badge */}
+                        <div className="relative mb-5 flex size-20 items-center justify-center rounded-2xl bg-gradient-to-br from-gold-500 via-amber-400 to-gold-600 text-ink-950 shadow-lg shadow-gold-500/20 ring-8 ring-gold-50/80">
+                          <Users className="size-9 stroke-[2.2]" />
+                          <span className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full bg-ink-950 text-gold-400 ring-2 ring-white shadow-xs">
+                            <UserPlus className="size-3.5 stroke-[2.5]" />
+                          </span>
+                        </div>
+
+                        <div className="inline-flex items-center gap-1.5 rounded-full border border-gold-300/80 bg-gold-50/80 px-3 py-1 text-[11.5px] font-semibold text-gold-900 mb-2">
+                          <span className="size-1.5 rounded-full bg-gold-500 animate-pulse" />
+                          Official Branch Directory Ready
+                        </div>
+
+                        <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-950">
+                          Branch Staff Roster is Empty
+                        </h3>
+
+                        <p className="mt-2 text-xs sm:text-[13.5px] text-zinc-600 leading-relaxed max-w-lg">
+                          No branch employees are enrolled yet. Branch officers can self-register from the terminal portal, or candidates awaiting clearance will appear in your queue once email verification is completed.
+                        </p>
+
+                        {/* Action Buttons */}
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                          {pendingStaff.length > 0 && (
+                            <Button
+                              variant="primary"
+                              size="md"
+                              leftIcon={<ShieldCheck className="size-4" />}
+                              onClick={() => handleTabChange('pending')}
+                              className="shadow-sm"
+                            >
+                              Review Clearance Queue ({pendingStaff.length})
+                            </Button>
+                          )}
+                          <Button
+                            variant={pendingStaff.length > 0 ? 'secondary' : 'primary'}
+                            size="md"
+                            leftIcon={copiedRegister ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+                            onClick={copyRegistrationLink}
+                            className="shadow-sm"
+                          >
+                            {copiedRegister ? 'Registration Link Copied!' : 'Copy Registration Link'}
+                          </Button>
+                          <Link to={paths.manager.settings}>
+                            <Button variant="ghost" size="md" leftIcon={<Briefcase className="size-4" />}>
+                              Manage Approved Positions
+                            </Button>
+                          </Link>
+                        </div>
+
+                        {/* 3 Step Guidance Cards */}
+                        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 w-full text-left pt-6 border-t border-zinc-100">
+                          <div className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3.5 space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900">
+                              <span className="flex size-4.5 items-center justify-center rounded-full bg-gold-500/20 text-[10px] text-gold-900 font-extrabold">1</span>
+                              Candidate Applies
+                            </div>
+                            <p className="text-[11px] text-zinc-500 leading-normal">
+                              Staff submits registration with official branch credentials.
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3.5 space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900">
+                              <span className="flex size-4.5 items-center justify-center rounded-full bg-gold-500/20 text-[10px] text-gold-900 font-extrabold">2</span>
+                              2FA Verification
+                            </div>
+                            <p className="text-[11px] text-zinc-500 leading-normal">
+                              Automated Brevo OTP code validates candidate identity.
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3.5 space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-900">
+                              <span className="flex size-4.5 items-center justify-center rounded-full bg-gold-500/20 text-[10px] text-gold-900 font-extrabold">3</span>
+                              Manager Clears
+                            </div>
+                            <p className="text-[11px] text-zinc-500 leading-normal">
+                              Sequential Employee ID is allocated & permissions activate.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : filteredStaff.length === 0 ? (
+                    <div className="rounded-2xl border border-zinc-200 bg-white p-8 sm:p-12 text-center shadow-xs">
+                      <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-500 ring-4 ring-zinc-50">
+                        <Search className="size-6 text-zinc-400" />
+                      </div>
+                      <h4 className="mt-4 text-base font-bold text-zinc-900">No Staff Matching Criteria</h4>
+                      <p className="mt-1 text-xs sm:text-sm text-zinc-500 max-w-sm mx-auto">
+                        No branch employees matched &quot;{search || statusFilter}&quot;. Try adjusting your search keyword or status filter.
+                      </p>
+                      <div className="mt-4">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          leftIcon={<RotateCcw className="size-3.5" />}
+                          onClick={() => {
+                            setSearch('');
+                            setStatusFilter('all');
+                          }}
+                        >
+                          Reset Filters
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Card>
                       <Table caption="Branch Staff Directory">
                         <THead>
                           <TR>
@@ -350,8 +478,8 @@ export function StaffListPage() {
                           ))}
                         </TBody>
                       </Table>
-                    )}
-                  </Card>
+                    </Card>
+                  )}
                 </div>
               ) : (
                 /* 10x Pending Approvals Tab */
