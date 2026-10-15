@@ -4,12 +4,13 @@ import {
   Search,
   Edit2,
   Users,
+  Trash2,
 } from 'lucide-react';
 import { kpiService } from '@/services/kpi.service';
 import { staffService } from '@/services/staff.service';
 import { useAsync } from '@/hooks/useAsync';
 import { useToast } from '@/context/ToastContext';
-import { PageHeader, AsyncBoundary } from '@/components/shared';
+import { PageHeader, AsyncBoundary, ConfirmDialog } from '@/components/shared';
 import { KpiFormDialog } from '@/components/kpi/KpiFormDialog';
 import { AssignKpiDialog } from '@/components/kpi/AssignKpiDialog';
 import {
@@ -43,6 +44,10 @@ export function KpiManagementPage() {
   const [assigningKpi, setAssigningKpi] = useState<Kpi | null>(null);
   const [assignedStaffIds, setAssignedStaffIds] = useState<string[]>([]);
   const [loadingStaffAssignments, setLoadingStaffAssignments] = useState(false);
+
+  // Delete modal
+  const [deletingKpi, setDeletingKpi] = useState<Kpi | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     const [kpis, staffList] = await Promise.all([
@@ -118,6 +123,25 @@ export function KpiManagementPage() {
       await state.reload({ silent: true });
     } catch {
       showToast({ tone: 'danger', title: 'Failed', message: 'Could not save assignments.' });
+    }
+  };
+
+  const handleDeleteKpi = async () => {
+    if (!deletingKpi) return;
+    setDeleting(true);
+    try {
+      await kpiService.delete(deletingKpi.id);
+      showToast({
+        tone: 'success',
+        title: 'KPI deleted',
+        message: `"${deletingKpi.name}" has been permanently removed.`,
+      });
+      setDeletingKpi(null);
+      await state.reload();
+    } catch {
+      showToast({ tone: 'danger', title: 'Delete failed', message: 'Could not delete KPI.' });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -287,6 +311,16 @@ export function KpiManagementPage() {
                               >
                                 Assign
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                leftIcon={<Trash2 className="size-3.5" />}
+                                onClick={() => setDeletingKpi(kpi)}
+                                title="Delete KPI"
+                              >
+                                Delete
+                              </Button>
                             </div>
                           </TD>
                         </TR>
@@ -312,6 +346,22 @@ export function KpiManagementPage() {
                 assignedStaffIds={assignedStaffIds}
                 loadingStaff={loadingStaffAssignments}
                 onSave={handleSaveAssignments}
+              />
+
+              {/* Delete KPI Confirmation Dialog */}
+              <ConfirmDialog
+                open={Boolean(deletingKpi)}
+                onCancel={() => setDeletingKpi(null)}
+                onConfirm={handleDeleteKpi}
+                title="Delete Performance Metric (KPI)"
+                description={
+                  deletingKpi && (deletingKpi.assignedStaffCount ?? 0) > 0
+                    ? `Are you sure you want to delete "${deletingKpi.name}"? Warning: ${deletingKpi.assignedStaffCount} staff member(s) are currently assigned to this metric. All past entries, targets, and historical records for this KPI will be permanently removed.`
+                    : `Are you sure you want to permanently delete the metric "${deletingKpi?.name}"? This action cannot be undone.`
+                }
+                confirmLabel="Delete KPI"
+                destructive
+                loading={deleting}
               />
             </div>
           );

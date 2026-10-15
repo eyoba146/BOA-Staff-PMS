@@ -87,3 +87,14 @@ export async function getMyAssignedKpis(req: Request, res: Response, next: NextF
     next(err);
   }
 }
+
+export async function deleteKpi(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    const userId = req.user?.id || req.user?.userId;
+    await kpiService.deleteKpi(id, userId, req.ip);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}

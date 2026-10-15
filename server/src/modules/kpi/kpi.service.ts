@@ -394,3 +394,29 @@ export async function getMyAssignedKpis(userId: string, date: string) {
   myAssignedCache.set(cacheKey, { data: result, timestamp: Date.now() });
   return result;
 }
+
+export async function deleteKpi(id: string, userId?: string, ipAddress?: string) {
+  const existing = await prisma.kpi.findUnique({ where: { id } });
+  if (!existing) {
+    throw ApiError.notFound('KPI not found');
+  }
+
+  // Safely delete assignments and entries first
+  await prisma.kpiAssignment.deleteMany({ where: { kpiId: id } });
+  await prisma.kpiEntry.deleteMany({ where: { kpiId: id } });
+  await prisma.feedback.updateMany({ where: { kpiId: id }, data: { kpiId: null } });
+
+  await prisma.kpi.delete({ where: { id } });
+
+  invalidateOverviewCache();
+  invalidateKpisCache();
+
+  if (userId) {
+    await recordAuditLog({
+      action: 'KPI_DELETED',
+      actorId: userId,
+      details: { kpiId: id, name: existing.name },
+      ipAddress,
+    });
+  }
+}

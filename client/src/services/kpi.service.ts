@@ -24,6 +24,8 @@ export interface KpiService {
   setAssignments(kpiId: string, staffIds: string[]): Promise<KpiAssignment[]>;
   /** KPIs assigned to the signed-in staff member, with any entry already recorded for `date`'s period. */
   getMyAssignedKpis(date: ISODate): Promise<AssignedKpi[]>;
+  /** Permanently delete KPI definition and related assignments/entries. */
+  delete(id: string): Promise<void>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -36,6 +38,7 @@ const httpKpiService: KpiService = {
   listAssignments: (filter) => api.get<KpiAssignment[]>('/kpi-assignments', filter),
   setAssignments: (kpiId, staffIds) => api.put<KpiAssignment[]>(`/kpis/${kpiId}/assignments`, { staffIds }),
   getMyAssignedKpis: (date) => api.get<AssignedKpi[]>('/kpis/assigned/me', { date }),
+  delete: (id) => api.delete<void>(`/kpis/${id}`),
 };
 
 // ---------------- Mock adapter ----------------
@@ -135,6 +138,17 @@ const mockKpiService: KpiService = {
       );
       return { kpi: hydrate(kpi), target, entry: stored ? toKpiEntry(stored, db) : null };
     });
+  },
+  async delete(id: string) {
+    await delay(300);
+    requireManager();
+    const db = getDb();
+    const idx = db.kpis.findIndex((k) => k.id === id);
+    if (idx === -1) throw mockError(404, 'NOT_FOUND', 'KPI not found.');
+    db.kpis.splice(idx, 1);
+    db.assignments = db.assignments.filter((a) => a.kpiId !== id);
+    db.entries = db.entries.filter((e) => e.kpiId !== id);
+    commit();
   },
 };
 

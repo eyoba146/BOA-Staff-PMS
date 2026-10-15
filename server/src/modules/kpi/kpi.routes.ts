@@ -15,6 +15,7 @@ kpiRoutes.get('/:id', authenticate, kpiController.getById);
 kpiRoutes.patch('/:id', authenticate, requireRole('manager'), kpiController.update);
 kpiRoutes.patch('/:id/status', authenticate, requireRole('manager'), kpiController.setStatus);
 kpiRoutes.put('/:id/assignments', authenticate, requireRole('manager'), kpiController.setAssignments);
+kpiRoutes.delete('/:id', authenticate, requireRole('manager'), kpiController.deleteKpi);
 
 // /api/kpi-assignments
 kpiAssignmentRoutes.get('/', authenticate, kpiController.listAssignments);
