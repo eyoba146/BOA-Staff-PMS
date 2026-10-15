@@ -16,6 +16,7 @@ export interface PositionService {
   create(req: CreatePositionRequest): Promise<Position>;
   update(id: string, req: UpdatePositionRequest): Promise<Position>;
   setActive(id: string, isActive: boolean): Promise<Position>;
+  delete(id: string): Promise<void>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -29,6 +30,7 @@ const httpPositionService: PositionService = {
   create: (req) => api.post<Position>('/positions', req),
   update: (id, req) => api.patch<Position>(`/positions/${id}`, req),
   setActive: (id, isActive) => api.patch<Position>(`/positions/${id}/status`, { isActive }),
+  delete: (id) => api.delete<void>(`/positions/${id}`),
 };
 
 // ---------------- Mock adapter ----------------
@@ -152,6 +154,17 @@ const mockPositionService: PositionService = {
 
   async setActive(id, isActive) {
     return this.update(id, { isActive });
+  },
+
+  async delete(id) {
+    await delay(300);
+    requireManager();
+    const db = getDb();
+    if (!db.positions) return;
+    const idx = db.positions.findIndex((p) => p.id === id);
+    if (idx === -1) throw mockError(404, 'NOT_FOUND', 'Position not found.');
+    db.positions.splice(idx, 1);
+    commit();
   },
 };
 

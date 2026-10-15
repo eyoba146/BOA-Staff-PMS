@@ -1,4 +1,4 @@
-import { Briefcase, Edit2, Plus, Power, Users } from 'lucide-react';
+import { Briefcase, Edit2, Plus, Power, Trash2, Users } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import {
@@ -48,6 +48,10 @@ export function PositionManagementSection() {
   // Activate / Deactivate confirmation
   const [confirmPos, setConfirmPos] = useState<Position | null>(null);
   const [toggling, setToggling] = useState(false);
+
+  // Delete confirmation
+  const [deletePos, setDeletePos] = useState<Position | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadPositions = useCallback(async () => {
     try {
@@ -154,6 +158,27 @@ export function PositionManagementSection() {
     }
   };
 
+  // Handle Delete Position
+  const handleDeletePosition = async () => {
+    if (!deletePos) return;
+    setDeleting(true);
+    try {
+      await positionService.delete(deletePos.id);
+      showToast({
+        tone: 'success',
+        title: 'Position deleted',
+        message: `"${deletePos.name}" has been permanently removed.`,
+      });
+      setDeletePos(null);
+      await loadPositions();
+    } catch (err) {
+      const apiErr = toApiError(err);
+      showToast({ tone: 'danger', title: 'Delete failed', message: apiErr.message });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader
@@ -246,6 +271,16 @@ export function PositionManagementSection() {
                         onClick={() => setConfirmPos(pos)}
                       >
                         {pos.isActive ? 'Deactivate' : 'Activate'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                        leftIcon={<Trash2 className="size-3.5" />}
+                        onClick={() => setDeletePos(pos)}
+                        title="Delete position"
+                      >
+                        Delete
                       </Button>
                     </div>
                   </TD>
@@ -366,6 +401,22 @@ export function PositionManagementSection() {
         confirmLabel={confirmPos?.isActive ? 'Deactivate Position' : 'Activate Position'}
         destructive={confirmPos?.isActive}
         loading={toggling}
+      />
+
+      {/* Delete Position Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(deletePos)}
+        onCancel={() => setDeletePos(null)}
+        onConfirm={handleDeletePosition}
+        title="Delete Approved Position"
+        description={
+          deletePos && (deletePos.assignedStaffCount ?? 0) > 0
+            ? `Are you sure you want to delete "${deletePos.name}"? Notice: ${deletePos.assignedStaffCount} staff member(s) currently hold this title. Their account records will remain intact, but their position reference will be detached.`
+            : `Are you sure you want to permanently delete the position "${deletePos?.name}"? This action cannot be undone.`
+        }
+        confirmLabel="Delete Position"
+        destructive
+        loading={deleting}
       />
     </Card>
   );

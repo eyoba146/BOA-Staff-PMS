@@ -256,4 +256,21 @@ export const positionRepository = {
   async setActive(id: string, isActive: boolean): Promise<StoredPosition | null> {
     return this.update(id, { isActive });
   },
+
+  async delete(id: string): Promise<boolean> {
+    if (env.DATABASE_URL) {
+      try {
+        await prisma.position.delete({ where: { id } });
+        return true;
+      } catch (err) {
+        console.error('Error deleting position from DB:', err);
+        return false;
+      }
+    }
+
+    const idx = memoryPositions.findIndex((p) => p.id === id);
+    if (idx === -1) return false;
+    memoryPositions.splice(idx, 1);
+    return true;
+  },
 };

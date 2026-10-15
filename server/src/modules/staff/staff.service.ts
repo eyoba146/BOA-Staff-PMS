@@ -355,4 +355,26 @@ export const staffService = {
   async getNextEmployeeId(): Promise<string> {
     return userRepository.getNextStaffEmployeeId();
   },
+
+  async delete(id: string, managerId?: string, ipAddress?: string): Promise<void> {
+    const user = await userRepository.findById(id);
+    if (!user || user.role !== 'staff') {
+      throw ApiError.notFound('Staff member not found.');
+    }
+
+    const success = await userRepository.deleteStaff(id);
+    if (!success) {
+      throw ApiError.internal('Failed to delete staff member.');
+    }
+
+    await recordAudit({
+      action: 'STAFF_DELETED',
+      actorId: managerId,
+      details: { staffId: id, email: user.email, fullName: user.fullName },
+      ipAddress,
+    });
+
+    invalidateOverviewCache();
+    invalidateStaffCache();
+  },
 };

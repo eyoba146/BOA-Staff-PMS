@@ -121,4 +121,13 @@ export const staffController = {
       next(err);
     }
   },
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      await staffService.delete(String(req.params.id), req.user?.userId, req.ip);
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
 };

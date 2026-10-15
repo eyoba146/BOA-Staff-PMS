@@ -27,6 +27,8 @@ export interface StaffService {
   requestEmailChange(newEmail: string): Promise<{ success: boolean; message: string; expiresAt: string; resendAfter: string; serverTime: string }>;
   /** Verify 6-digit code and finalize staff email update. */
   verifyEmailChange(newEmail: string, code: string): Promise<User>;
+  /** Permanently delete staff member and associated records (Manager only). */
+  delete(id: string): Promise<void>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -42,6 +44,7 @@ const httpStaffService: StaffService = {
   getNextEmployeeId: () => api.get<{ employeeId: string }>('/staff/next-employee-id'),
   requestEmailChange: (newEmail) => api.post('/staff/email/request', { newEmail }),
   verifyEmailChange: (newEmail, code) => api.post<User>('/staff/email/verify', { newEmail, code }),
+  delete: (id) => api.delete<void>(`/staff/${id}`),
 };
 
 // ---------------- Mock adapter ----------------
@@ -199,6 +202,18 @@ const mockStaffService: StaffService = {
     user.email = newEmail.trim();
     commit();
     return toPublicUser(user);
+  },
+  async delete(id: string) {
+    await delay(400);
+    requireManager();
+    const db = getDb();
+    const idx = db.users.findIndex((u) => u.id === id && u.role === 'staff');
+    if (idx === -1) throw mockError(404, 'NOT_FOUND', 'Staff member not found.');
+    db.users.splice(idx, 1);
+    db.assignments = db.assignments.filter((a) => a.staffId !== id);
+    db.entries = db.entries.filter((e) => e.staffId !== id);
+    db.feedback = db.feedback.filter((f) => f.staffId !== id && f.managerId !== id);
+    commit();
   },
 };
 

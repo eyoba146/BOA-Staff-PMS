@@ -62,3 +62,10 @@ staffRouter.patch(
   validateBody(setStaffStatusSchema),
   staffController.setStatus,
 );
+
+staffRouter.delete(
+  '/:id',
+  requireAuth,
+  requireManager,
+  staffController.delete,
+);

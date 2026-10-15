@@ -10,9 +10,11 @@ import {
   Mail,
   User as UserIcon,
   Clock,
+  Camera,
 } from 'lucide-react';
 import { settingsService } from '@/services/settings.service';
 import { authService } from '@/services/auth.service';
+import { staffService } from '@/services/staff.service';
 import { toApiError } from '@/services/http/apiClient';
 import { useVerificationTimer } from '@/hooks/useVerificationTimer';
 import { env } from '@/config/env';
@@ -30,9 +32,11 @@ import {
   Checkbox,
   Dialog,
   Alert,
+  Avatar,
 } from '@/components/ui';
 import { required, strongPassword, validateForm, hasErrors } from '@/utils/validation';
 import { PositionManagementSection } from '@/components/manager';
+import { ProfilePhotoDialog } from '@/components/profile/ProfilePhotoDialog';
 import type { SystemSettings } from '@/types';
 
 export function SettingsPage() {
@@ -49,6 +53,28 @@ export function SettingsPage() {
   const [managerFullName, setManagerFullName] = useState(user?.fullName || '');
   const [savingManagerName, setSavingManagerName] = useState(false);
   const [managerNameError, setManagerNameError] = useState<string | null>(null);
+  const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
+
+  const handleSavePhoto = async (newAvatarUrl: string | null) => {
+    try {
+      const updated = await staffService.updateMyProfile({ avatarUrl: newAvatarUrl });
+      updateUser(updated);
+      showToast({
+        tone: 'success',
+        title: 'Profile photo updated',
+        message: newAvatarUrl
+          ? 'Your manager profile picture has been saved successfully.'
+          : 'Your profile picture has been removed.',
+      });
+    } catch {
+      showToast({
+        tone: 'danger',
+        title: 'Update failed',
+        message: 'Could not save your profile picture. Please try again.',
+      });
+      throw new Error('Save photo failed');
+    }
+  };
 
   // Email change state
   const [newManagerEmail, setNewManagerEmail] = useState('');
@@ -500,6 +526,51 @@ export function SettingsPage() {
                   }
                 />
                 <CardBody className="space-y-6">
+                  {/* Manager Avatar & Quick Photo Upload */}
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 pb-6 border-b border-zinc-100">
+                    <div className="relative group shrink-0">
+                      <Avatar
+                        name={user?.fullName || 'Branch Manager'}
+                        src={user?.avatarUrl}
+                        size="xl"
+                        className="size-24 text-2xl font-bold bg-ink-900 text-white shadow-md ring-4 ring-gold-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setPhotoDialogOpen(true)}
+                        className="absolute right-0 bottom-0 flex size-8 items-center justify-center rounded-full bg-gold-500 text-zinc-950 shadow-md ring-2 ring-white transition hover:bg-gold-400 hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-gold-500 cursor-pointer"
+                        title="Update manager photo"
+                        aria-label="Update manager photo"
+                      >
+                        <Camera className="size-4" />
+                      </button>
+                    </div>
+
+                    <div className="flex-1 text-center sm:text-left space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <h4 className="text-base font-bold text-zinc-900">{user?.fullName || 'Branch Manager'}</h4>
+                        <span className="inline-flex items-center gap-1 rounded-md bg-gold-50 border border-gold-300 px-2 py-0.5 text-[11px] font-semibold text-gold-900">
+                          <ShieldCheck className="size-3 text-gold-600" />
+                          Branch Administrator
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-500 max-w-md">
+                        Upload an official branch identification portrait. This photo is displayed in branch communications, staff announcements, and chat channels.
+                      </p>
+                      <div className="pt-1">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          leftIcon={<Camera className="size-3.5" />}
+                          onClick={() => setPhotoDialogOpen(true)}
+                        >
+                          {user?.avatarUrl ? 'Change Profile Photo' : 'Upload Profile Photo'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Manager Full Name Update */}
                   <form onSubmit={handleSaveManagerName} className="space-y-4 pb-6 border-b border-zinc-100">
                     <div className="flex items-center justify-between">
@@ -857,6 +928,15 @@ export function SettingsPage() {
                   </div>
                 </div>
               </Dialog>
+
+              {/* Manager Profile Photo Dialog */}
+              <ProfilePhotoDialog
+                open={photoDialogOpen}
+                onClose={() => setPhotoDialogOpen(false)}
+                currentAvatarUrl={user?.avatarUrl}
+                userName={user?.fullName || 'Branch Manager'}
+                onSave={handleSavePhoto}
+              />
             </div>
           );
         }}

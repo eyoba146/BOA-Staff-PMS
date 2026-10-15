@@ -48,4 +48,13 @@ export const positionController = {
       next(err);
     }
   },
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      await positionService.delete(String(req.params.id));
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
 };

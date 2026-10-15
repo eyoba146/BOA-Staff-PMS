@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   MessageSquareText,
   UserX,
   UserCheck,
+  Trash2,
   TrendingUp,
   CheckCircle2,
   Mail,
@@ -49,6 +50,7 @@ import {
 
 export function StaffDetailPage() {
   const { staffId } = useParams<{ staffId: string }>();
+  const navigate = useNavigate();
   const { showToast } = useToast();
 
   const [periodState, setPeriodState] = useState<{ period: PerformancePeriod; date: string }>({
@@ -59,6 +61,8 @@ export function StaffDetailPage() {
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingStaff, setDeletingStaff] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!staffId) throw new Error('Missing staff identifier');
@@ -115,6 +119,26 @@ export function StaffDetailPage() {
     }
   };
 
+  const handleDeleteStaff = async () => {
+    if (!state.data?.staff) return;
+    const current = state.data.staff;
+    setDeletingStaff(true);
+    try {
+      await staffService.delete(current.id);
+      showToast({
+        tone: 'success',
+        title: 'Staff member deleted',
+        message: `${current.fullName}'s account and records have been permanently removed.`,
+      });
+      setDeleteConfirmOpen(false);
+      navigate(paths.manager.staff, { replace: true });
+    } catch {
+      showToast({ tone: 'danger', title: 'Action failed', message: 'Could not delete staff member.' });
+    } finally {
+      setDeletingStaff(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Back link */}
@@ -167,13 +191,22 @@ export function StaffDetailPage() {
                     Give Feedback
                   </Button>
                   <Button
-                    variant={isActive ? 'danger' : 'secondary'}
+                    variant={isActive ? 'secondary' : 'secondary'}
                     size="sm"
                     className="flex-1 sm:flex-initial"
                     leftIcon={isActive ? <UserX className="size-4" /> : <UserCheck className="size-4" />}
                     onClick={() => setStatusConfirmOpen(true)}
                   >
                     {isActive ? 'Deactivate' : 'Reactivate'}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    className="flex-1 sm:flex-initial"
+                    leftIcon={<Trash2 className="size-4" />}
+                    onClick={() => setDeleteConfirmOpen(true)}
+                  >
+                    Delete
                   </Button>
                 </div>
               </div>
@@ -340,6 +373,17 @@ export function StaffDetailPage() {
                 confirmLabel={isActive ? 'Deactivate Account' : 'Reactivate Account'}
                 destructive={isActive}
                 loading={updatingStatus}
+              />
+
+              <ConfirmDialog
+                open={deleteConfirmOpen}
+                onCancel={() => setDeleteConfirmOpen(false)}
+                onConfirm={handleDeleteStaff}
+                title="Delete Staff Account"
+                description={`Are you sure you want to permanently delete ${staff.fullName}'s account (${staff.employeeId || staff.email})? All operational records, assignments, and credentials will be permanently erased. This action cannot be undone.`}
+                confirmLabel="Delete Account"
+                destructive
+                loading={deletingStaff}
               />
             </div>
           );

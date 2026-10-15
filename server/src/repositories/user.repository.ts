@@ -664,4 +664,45 @@ export const userRepository = {
     user.updatedAt = new Date().toISOString();
     return user;
   },
+
+  async deleteStaff(id: string): Promise<boolean> {
+    if (env.DATABASE_URL) {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id },
+          select: { role: true, email: true, employeeId: true, referenceId: true },
+        });
+
+        if (!user || user.role === 'manager') {
+          return false;
+        }
+
+        const targets = [user.email, user.employeeId, user.referenceId].filter(Boolean) as string[];
+
+        // Cascade cleanup safely
+        await prisma.kpiAssignment.deleteMany({ where: { staffId: id } });
+        await prisma.kpiEntry.deleteMany({ where: { staffId: id } });
+        await prisma.feedback.deleteMany({ where: { OR: [{ staffId: id }, { managerId: id }] } });
+        await prisma.announcementRead.deleteMany({ where: { userId: id } });
+        await prisma.announcement.deleteMany({ where: { authorId: id } });
+        await prisma.chatMessage.deleteMany({ where: { senderId: id } });
+        await prisma.conversationParticipant.deleteMany({ where: { userId: id } });
+        await prisma.auditLog.updateMany({ where: { actorId: id }, data: { actorId: null } });
+        if (targets.length > 0) {
+          await prisma.verificationCode.deleteMany({ where: { target: { in: targets } } });
+        }
+
+        await prisma.user.delete({ where: { id } });
+        return true;
+      } catch (err) {
+        console.error('Error deleting staff from DB:', err);
+        return false;
+      }
+    }
+
+    const idx = memoryUsers.findIndex((u) => u.id === id && u.role === 'staff');
+    if (idx === -1) return false;
+    memoryUsers.splice(idx, 1);
+    return true;
+  },
 };

@@ -54,4 +54,15 @@ export const positionService = {
     }
     return updated;
   },
+
+  async delete(id: string): Promise<void> {
+    const current = await positionRepository.findById(id);
+    if (!current) {
+      throw ApiError.notFound('Position not found');
+    }
+    const success = await positionRepository.delete(id);
+    if (!success) {
+      throw ApiError.internal('Failed to delete position');
+    }
+  },
 };

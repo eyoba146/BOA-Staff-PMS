@@ -17,11 +17,12 @@ import {
   Lock,
   XCircle,
   FileBadge,
+  Trash2,
 } from 'lucide-react';
 import { staffService } from '@/services/staff.service';
 import { useAsync } from '@/hooks/useAsync';
 import { useToast } from '@/context/ToastContext';
-import { PageHeader, AsyncBoundary } from '@/components/shared';
+import { PageHeader, AsyncBoundary, ConfirmDialog } from '@/components/shared';
 import {
   Card,
   Button,
@@ -80,6 +81,10 @@ export function StaffListPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
   const [rejecting, setRejecting] = useState(false);
+
+  // Delete staff state
+  const [deleteUser, setDeleteUser] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     const [allStaff, pendingStaff] = await Promise.all([
@@ -154,6 +159,26 @@ export function StaffListPage() {
       showToast({ tone: 'danger', title: 'Rejection failed', message: 'Could not reject staff account.' });
     } finally {
       setRejecting(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUser) return;
+    setDeleting(true);
+    try {
+      await staffService.delete(deleteUser.id);
+      showToast({
+        tone: 'success',
+        title: 'Staff member deleted',
+        message: `${deleteUser.fullName}'s account has been permanently removed.`,
+      });
+      setDeleteUser(null);
+      await state.reload();
+    } catch (err) {
+      const apiErr = toApiError(err);
+      showToast({ tone: 'danger', title: 'Delete failed', message: apiErr.message });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -303,11 +328,23 @@ export function StaffListPage() {
                                 {formatDate(staff.createdAt)}
                               </TD>
                               <TD align="right">
-                                <Link to={paths.manager.staffDetail(staff.id)}>
-                                  <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
-                                    Profile
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <Link to={paths.manager.staffDetail(staff.id)}>
+                                    <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
+                                      Profile
+                                    </Button>
+                                  </Link>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                    leftIcon={<Trash2 className="size-3.5" />}
+                                    onClick={() => setDeleteUser(staff)}
+                                    title="Delete staff account"
+                                  >
+                                    Delete
                                   </Button>
-                                </Link>
+                                </div>
                               </TD>
                             </TR>
                           ))}
@@ -684,6 +721,18 @@ export function StaffListPage() {
           </Field>
         </div>
       </Dialog>
+
+      {/* Delete Staff Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(deleteUser)}
+        onCancel={() => setDeleteUser(null)}
+        onConfirm={handleDeleteUser}
+        title="Delete Staff Account"
+        description={`Are you sure you want to permanently delete ${deleteUser?.fullName}'s account (${deleteUser?.employeeId || deleteUser?.email})? All associated performance entries, feedback, and registrations will be permanently erased. This action cannot be undone.`}
+        confirmLabel="Delete Account"
+        destructive
+        loading={deleting}
+      />
     </div>
   );
 }

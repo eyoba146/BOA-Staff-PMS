@@ -39,3 +39,10 @@ positionRouter.patch(
   validateBody(setPositionStatusSchema),
   positionController.setActive,
 );
+
+positionRouter.delete(
+  '/:id',
+  requireAuth,
+  requireManager,
+  positionController.delete,
+);
