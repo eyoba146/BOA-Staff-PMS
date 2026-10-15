@@ -173,12 +173,13 @@ export function trendFor(
       period === 'daily' || period === 'weekly'
         ? start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
         : period === 'monthly'
-          ? start.toLocaleDateString('en-GB', { month: 'short' })
+          ? start.toLocaleDateString('en-US', { month: 'short' })
           : b.label;
+    const avg = values.length ? values.reduce((s, v) => s + v, 0) / values.length : null;
     out.push({
       label,
       periodStart: b.start,
-      percent: values.length ? Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10 : null,
+      percent: avg !== null && Number.isFinite(avg) ? Math.round(avg * 10) / 10 : null,
     });
   }
   return out;

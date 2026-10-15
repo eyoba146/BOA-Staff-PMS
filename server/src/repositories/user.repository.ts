@@ -434,6 +434,24 @@ export const userRepository = {
             approvedAt: new Date(),
           },
         });
+
+        // Determine target KPI IDs to assign (either explicit list or active branch KPIs)
+        let targetKpiIds = kpiIds;
+        if (!targetKpiIds || targetKpiIds.length === 0) {
+          const activeKpis = await prisma.kpi.findMany({
+            where: { isActive: true },
+            select: { id: true },
+          });
+          targetKpiIds = activeKpis.map((k: { id: string }) => k.id);
+        }
+
+        if (targetKpiIds && targetKpiIds.length > 0) {
+          await prisma.kpiAssignment.createMany({
+            data: targetKpiIds.map((kpiId: string) => ({ kpiId, staffId: id })),
+            skipDuplicates: true,
+          });
+        }
+
         return mapPrismaUser(updated);
       } catch {
         // Fall back to memory
@@ -446,9 +464,7 @@ export const userRepository = {
       user.status = 'active';
       user.approvedAt = now;
       user.updatedAt = now;
-      if (kpiIds && kpiIds.length > 0) {
-        user.assignedKpiCount = kpiIds.length;
-      }
+      user.assignedKpiCount = kpiIds && kpiIds.length > 0 ? kpiIds.length : 3;
       return user;
     }
     return null;

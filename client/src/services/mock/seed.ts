@@ -216,7 +216,7 @@ export function createSeed(): MockDb {
     u_s01: 1.02, u_s02: 0.86, u_s03: 1.08, u_s04: 0.74, u_s05: 0.95, u_s06: 1.12, u_s07: 0.81,
   };
   const entries: StoredEntry[] = [];
-  const DAYS = 130;
+  const DAYS = 180; // Ensure full 6-month historical coverage (May to October 2026)
   for (const [staffId, kpiIds] of Object.entries(plan)) {
     if (!factor[staffId]) continue;
     for (const kpiId of kpiIds) {

@@ -7,6 +7,7 @@ import { sendTransactionalEmail } from '../../config/brevo.js';
 import { renderVerificationCodeEmail } from '../../utils/emailTemplates.js';
 import { toPublicUser } from '../auth/auth.service.js';
 import { generateVerificationCode } from '../../utils/code.js';
+import { invalidateOverviewCache } from '../performance/performance.service.js';
 
 let cachedSettings: any = null;
 let cachedSettingsExpiry = 0;
@@ -132,6 +133,7 @@ export async function updateSettings(data: any, managerId: string) {
   });
 
   invalidateSettingsCache();
+  invalidateOverviewCache();
 
   return {
     branchName: updated.branchName,
