@@ -11,6 +11,7 @@ import {
   TrendingUp,
   UserRound,
   Users,
+  Layers,
   type LucideIcon,
 } from 'lucide-react';
 import { paths } from '@/routes/paths';
@@ -60,6 +61,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
       items: [
         { label: 'Staff', to: paths.manager.staff, icon: Users, countKey: 'pendingApprovals' },
         { label: 'KPIs', to: paths.manager.kpis, icon: Target },
+        { label: 'Campaigns', to: paths.manager.campaigns, icon: Layers },
         { label: 'Performance', to: paths.manager.performance, icon: TrendingUp },
         { label: 'Reports', to: paths.manager.reports, icon: FileBarChart },
       ],

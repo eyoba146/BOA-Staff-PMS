@@ -102,6 +102,8 @@ model User {
   conversationParticipants ConversationParticipant[]
   messages                 ChatMessage[]
   auditLogs                AuditLog[]
+  notifications            Notification[]
+  campaigns                Campaign[]
 
   @@index([email])
   @@index([employeeId])
@@ -179,23 +181,30 @@ model KpiEntry {
 }
 
 model Feedback {
-  id          String    @id @default(uuid())
-  staffId     String
-  staff       User      @relation("ReceivedFeedback", fields: [staffId], references: [id], onDelete: Cascade)
-  managerId   String
-  manager     User      @relation("SentFeedback", fields: [managerId], references: [id], onDelete: Cascade)
-  subject     String
-  message     String
-  period      String?
-  periodLabel String?
-  kpiId       String?
-  kpi         Kpi?      @relation(fields: [kpiId], references: [id], onDelete: SetNull)
-  readAt      DateTime?
-  createdAt   DateTime  @default(now())
+  id               String    @id @default(uuid())
+  staffId          String
+  staff            User      @relation("ReceivedFeedback", fields: [staffId], references: [id], onDelete: Cascade)
+  managerId        String
+  manager          User      @relation("SentFeedback", fields: [managerId], references: [id], onDelete: Cascade)
+  type             String    @default("feedback")
+  audience         String    @default("recipient_only")
+  subject          String
+  message          String
+  period           String?
+  periodLabel      String?
+  kpiId            String?
+  kpi              Kpi?      @relation(fields: [kpiId], references: [id], onDelete: SetNull)
+  emailStatus      String    @default("queued")
+  emailDeliveredAt DateTime?
+  emailError       String?
+  batchId          String?
+  readAt           DateTime?
+  createdAt        DateTime  @default(now())
 
   @@index([staffId])
   @@index([managerId])
   @@index([createdAt])
+  @@index([batchId])
 }
 
 model Announcement {
@@ -308,4 +317,50 @@ model AuditLog {
   @@index([action])
   @@index([actorId])
   @@index([createdAt])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String    @default("info")
+  link      String?
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+model Campaign {
+  id          String   @id @default(uuid())
+  name        String
+  type        String
+  target      Float
+  actual      Float?
+  achievement Float?
+  status      String   @default("planned")
+  startDate   String
+  endDate     String
+  description String?
+  managerId   String
+  manager     User     @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([managerId])
+  @@index([status])
+  @@index([startDate, endDate])
+}
+
+model CampaignType {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([name])
 }

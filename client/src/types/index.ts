@@ -4,3 +4,4 @@ export * from './position';
 export * from './kpi';
 export * from './performance';
 export * from './communication';
+export * from './campaign';

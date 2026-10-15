@@ -9,4 +9,5 @@ feedbackRoutes.get('/me', authenticate, feedbackController.listMine);
 
 feedbackRoutes.get('/', authenticate, requireRole('manager'), feedbackController.list);
 feedbackRoutes.post('/', authenticate, requireRole('manager'), feedbackController.create);
+feedbackRoutes.post('/:id/retry-email', authenticate, requireRole('manager'), feedbackController.retryEmail);
 feedbackRoutes.patch('/:id/read', authenticate, feedbackController.markRead);

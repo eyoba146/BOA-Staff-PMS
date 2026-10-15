@@ -23,6 +23,7 @@ export const paths = {
     staff: '/manager/staff',
     staffDetail: (id: string) => `/manager/staff/${id}`,
     kpis: '/manager/kpis',
+    campaigns: '/manager/campaigns',
     performance: '/manager/performance',
     reports: '/manager/reports',
     feedback: '/manager/feedback',

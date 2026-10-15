@@ -12,8 +12,10 @@ import {
   CheckCircle2,
   Award,
   ShieldCheck,
+  Layers,
 } from 'lucide-react';
 import { performanceService } from '@/services/performance.service';
+import { campaignService } from '@/services/campaign.service';
 import { useAsync } from '@/hooks/useAsync';
 import { useAuth } from '@/context/AuthContext';
 import { todayISO, addDays, formatDate } from '@/utils/date';
@@ -50,7 +52,7 @@ export function ReportsPage() {
   const [period, setPeriod] = useState<PerformancePeriod>('monthly');
   const [fromDate, setFromDate] = useState(() => addDays(todayISO(), -30));
   const [toDate, setToDate] = useState(() => todayISO());
-  const [activeReportTab, setActiveReportTab] = useState<'staff' | 'kpi' | 'executive'>('staff');
+  const [activeReportTab, setActiveReportTab] = useState<'staff' | 'kpi' | 'campaign' | 'executive'>('staff');
 
   // Interactive filters within the report view
   const [staffSearch, setStaffSearch] = useState('');
@@ -58,7 +60,11 @@ export function ReportsPage() {
   const [kpiSearch, setKpiSearch] = useState('');
 
   const loadReport = useCallback(async () => {
-    return performanceService.getReport(period, fromDate, toDate);
+    const [reportData, campaignsData] = await Promise.all([
+      performanceService.getReport(period, fromDate, toDate),
+      campaignService.list().catch(() => ({ campaigns: [], summary: { total: 0, inProgress: 0, completed: 0, planned: 0, averageAchievement: null } })),
+    ]);
+    return { ...reportData, campaignsData };
   }, [period, fromDate, toDate]);
 
   const state = useAsync(loadReport, [loadReport]);
@@ -476,6 +482,19 @@ export function ReportsPage() {
 
               <button
                 type="button"
+                onClick={() => setActiveReportTab('campaign')}
+                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+                  activeReportTab === 'campaign'
+                    ? 'border-ink-950 text-ink-950'
+                    : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
+                }`}
+              >
+                <Layers className="size-4" />
+                Branch Campaigns ({loadedReport.campaignsData?.campaigns?.length ?? 0})
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveReportTab('executive')}
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
                   activeReportTab === 'executive'
@@ -803,6 +822,71 @@ export function ReportsPage() {
                       </dl>
                     </div>
                   </div>
+                </CardBody>
+              </Card>
+            </div>
+
+            {/* ========================================================================= */}
+            {/* Section: Branch Operational Campaigns                                     */}
+            {/* ========================================================================= */}
+            <div className={activeReportTab === 'campaign' ? 'block' : 'hidden print:block'}>
+              <Card>
+                <CardHeader
+                  title="Branch Operational Campaigns & Mobilization"
+                  description="Operational campaigns, branch deposit sprint targets, and measured attainment."
+                  actions={
+                    <div className="flex items-center gap-2 print:hidden">
+                      <Link to={paths.manager.campaigns}>
+                        <Button variant="secondary" size="sm">
+                          Manage Campaigns
+                        </Button>
+                      </Link>
+                    </div>
+                  }
+                />
+                <CardBody className="p-0">
+                  {(!loadedReport.campaignsData?.campaigns || loadedReport.campaignsData.campaigns.length === 0) ? (
+                    <div className="p-8 text-center text-xs text-zinc-500">
+                      No operational campaigns recorded for this reporting period.
+                    </div>
+                  ) : (
+                    <Table>
+                      <THead>
+                        <TR>
+                          <TH>Campaign Name</TH>
+                          <TH>Type</TH>
+                          <TH className="text-right">Target / Plan</TH>
+                          <TH className="text-right">Actual</TH>
+                          <TH className="text-center">Achievement</TH>
+                          <TH>Timeline</TH>
+                          <TH>Status</TH>
+                        </TR>
+                      </THead>
+                      <TBody>
+                        {loadedReport.campaignsData.campaigns.map((c: any) => (
+                          <TR key={c.id}>
+                            <TD className="font-semibold text-zinc-900">{c.name}</TD>
+                            <TD className="text-zinc-600">{c.type}</TD>
+                            <TD className="text-right font-mono font-medium">{c.target.toLocaleString()}</TD>
+                            <TD className="text-right font-mono">
+                              {c.actual !== null ? c.actual.toLocaleString() : 'Not entered'}
+                            </TD>
+                            <TD className="text-center font-bold">
+                              {c.achievement !== null ? `${Math.round(c.achievement)}%` : 'N/A'}
+                            </TD>
+                            <TD className="text-xs text-zinc-500">
+                              {c.startDate} → {c.endDate}
+                            </TD>
+                            <TD>
+                              <Badge tone={c.status === 'completed' ? 'success' : c.status === 'in_progress' ? 'info' : 'neutral'}>
+                                {c.status}
+                              </Badge>
+                            </TD>
+                          </TR>
+                        ))}
+                      </TBody>
+                    </Table>
+                  )}
                 </CardBody>
               </Card>
             </div>

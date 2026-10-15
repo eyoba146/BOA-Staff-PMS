@@ -28,6 +28,7 @@ import { ManagerDashboardPage } from '@/pages/manager/ManagerDashboardPage';
 import { StaffListPage } from '@/pages/manager/StaffListPage';
 import { StaffDetailPage } from '@/pages/manager/StaffDetailPage';
 import { KpiManagementPage } from '@/pages/manager/KpiManagementPage';
+import { CampaignsPage } from '@/pages/manager/CampaignsPage';
 import { PerformanceMonitoringPage } from '@/pages/manager/PerformanceMonitoringPage';
 import { ReportsPage } from '@/pages/manager/ReportsPage';
 import { ManagerFeedbackPage } from '@/pages/manager/ManagerFeedbackPage';
@@ -72,6 +73,7 @@ export function AppRouter() {
             <Route path={paths.manager.staff} element={<StaffListPage />} />
             <Route path="/manager/staff/:staffId" element={<StaffDetailPage />} />
             <Route path={paths.manager.kpis} element={<KpiManagementPage />} />
+            <Route path={paths.manager.campaigns} element={<CampaignsPage />} />
             <Route path={paths.manager.performance} element={<PerformanceMonitoringPage />} />
             <Route path={paths.manager.reports} element={<ReportsPage />} />
             <Route path={paths.manager.feedback} element={<ManagerFeedbackPage />} />

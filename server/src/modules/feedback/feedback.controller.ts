@@ -14,8 +14,8 @@ export async function listMine(req: Request, res: Response, next: NextFunction) 
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   try {
-    const { staffId } = req.query as { staffId?: string };
-    const list = await feedbackService.listAllFeedback({ staffId });
+    const { staffId, type } = req.query as { staffId?: string; type?: string };
+    const list = await feedbackService.listAllFeedback({ staffId, type });
     res.json(list);
   } catch (err) {
     next(err);
@@ -25,12 +25,14 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 export async function create(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.id || req.user!.userId;
-    const { staffId, subject, message, period, periodLabel, kpiId } = req.body;
+    const { staffId, type, audience, subject, message, period, periodLabel, kpiId } = req.body;
     if (!staffId || !subject || !message) {
-      throw ApiError.badRequest('staffId, subject, and message are required.');
+      throw ApiError.badRequest('Recipient (staffId), subject, and message are required.');
     }
     const created = await feedbackService.createFeedback(userId, {
       staffId,
+      type,
+      audience,
       subject,
       message,
       period,
@@ -38,6 +40,17 @@ export async function create(req: Request, res: Response, next: NextFunction) {
       kpiId,
     });
     res.status(201).json(created);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function retryEmail(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    const userId = req.user!.id || req.user!.userId;
+    const updated = await feedbackService.retryFeedbackEmail(id, userId);
+    res.json(updated);
   } catch (err) {
     next(err);
   }

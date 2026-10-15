@@ -71,7 +71,20 @@ export function StaffFeedbackPage() {
                       )}
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-semibold text-zinc-900 text-sm">{item.subject}</span>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-zinc-900 text-sm">{item.subject}</span>
+                            {item.type === 'warning' ? (
+                              <Badge tone="danger" className="text-[10px] py-0 px-1.5">Warning</Badge>
+                            ) : item.type === 'reminder' ? (
+                              <Badge tone="info" className="text-[10px] py-0 px-1.5">Reminder</Badge>
+                            ) : item.type === 'appreciation' ? (
+                              <Badge tone="success" className="text-[10px] py-0 px-1.5">Appreciation</Badge>
+                            ) : (
+                              <Badge tone="attention" className="text-[10px] py-0 px-1.5">Feedback</Badge>
+                            )}
+                          </div>
+                        </div>
                         {isUnread && <Badge tone="gold">New</Badge>}
                       </div>
 
@@ -93,7 +106,7 @@ export function StaffFeedbackPage() {
                   <Card className="sticky top-20">
                     <CardHeader
                       title={selectedItem.subject}
-                      description={`Provided by ${selectedItem.managerName}`}
+                      description={`Issued by ${selectedItem.managerName}`}
                       actions={
                         selectedItem.readAt ? (
                           <span className="inline-flex items-center gap-1 text-xs text-zinc-400">
@@ -106,6 +119,15 @@ export function StaffFeedbackPage() {
                     <CardBody className="space-y-4">
                       {/* Context Pills */}
                       <div className="flex flex-wrap items-center gap-2">
+                        {selectedItem.type === 'warning' ? (
+                          <Badge tone="danger">Formal Warning</Badge>
+                        ) : selectedItem.type === 'reminder' ? (
+                          <Badge tone="info">Action Reminder</Badge>
+                        ) : selectedItem.type === 'appreciation' ? (
+                          <Badge tone="success">Staff Appreciation</Badge>
+                        ) : (
+                          <Badge tone="attention">Performance Feedback</Badge>
+                        )}
                         {selectedItem.periodLabel && (
                           <Badge tone="info" icon={<Calendar className="size-3" />}>
                             Period: {selectedItem.periodLabel}

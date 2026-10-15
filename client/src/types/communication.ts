@@ -1,30 +1,46 @@
 import type { ISODateTime, PerformancePeriod, RuleStatus } from './common';
 
-// ---------- Feedback ----------
+// ---------- Feedback / Communication ----------
+export type CommunicationType = 'feedback' | 'reminder' | 'warning' | 'appreciation';
+export type CommunicationAudience = 'recipient_only' | 'recipient_and_manager';
+
 export interface Feedback {
   id: string;
   staffId: string;
   staffName: string;
+  employeeId?: string | null;
+  position?: string | null;
+  recipientEmail?: string | null;
   managerId: string;
   managerName: string;
+  type?: CommunicationType;
+  audience?: CommunicationAudience;
   subject: string;
   message: string;
   period?: PerformancePeriod | null;
   periodLabel?: string | null;
   kpiId?: string | null;
   kpiName?: string | null;
+  emailStatus?: 'queued' | 'sent' | 'delivered' | 'failed';
+  emailDeliveredAt?: ISODateTime | null;
+  emailError?: string | null;
+  batchId?: string | null;
   createdAt: ISODateTime;
   readAt: ISODateTime | null;
 }
 
 export interface FeedbackInput {
   staffId: string;
+  recipientType?: 'individual' | 'all';
+  type?: CommunicationType;
+  audience?: CommunicationAudience;
   subject: string;
   message: string;
   period?: PerformancePeriod | null;
   periodLabel?: string | null;
   kpiId?: string | null;
 }
+
 
 // ---------- Announcements ----------
 /** Derived from the kickoff objective: "meetings, holidays, and other notices". */

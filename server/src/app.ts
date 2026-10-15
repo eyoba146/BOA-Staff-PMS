@@ -22,6 +22,8 @@ import { announcementRoutes } from './modules/announcement/announcement.routes.j
 import { chatRoutes } from './modules/chat/chat.routes.js';
 import { settingsRoutes } from './modules/settings/settings.routes.js';
 import { realtimeRoutes } from './modules/realtime/realtime.routes.js';
+import { campaignRoutes } from './modules/campaign/campaign.routes.js';
+import { notificationRoutes } from './modules/notification/notification.routes.js';
 
 export const app = express();
 
@@ -107,6 +109,8 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/conversations', chatRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/realtime', realtimeRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // 404 Catch-All
 app.use((req, res, next) => {

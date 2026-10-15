@@ -368,3 +368,183 @@ export function renderRejectionEmail({
 </html>
   `.trim();
 }
+
+export interface CommunicationEmailOptions {
+  recipientName: string;
+  senderName: string;
+  type: 'feedback' | 'reminder' | 'warning' | 'appreciation';
+  subject: string;
+  message: string;
+  periodLabel?: string;
+  branchName?: string;
+}
+
+export function renderCommunicationEmail({
+  recipientName,
+  senderName,
+  type,
+  subject,
+  message,
+  periodLabel,
+  branchName = 'Bank of Abyssinia Main Branch',
+}: CommunicationEmailOptions): string {
+  const config = {
+    feedback: {
+      title: 'Performance Feedback',
+      badge: 'PERFORMANCE FEEDBACK',
+      ribbon: 'linear-gradient(90deg, #b45309 0%, #d97706 25%, #f59e0b 50%, #fbbf24 85%, #d97706 100%)',
+      badgeBg: 'rgba(245, 158, 11, 0.15)',
+      badgeBorder: 'rgba(245, 158, 11, 0.4)',
+      badgeColor: '#fbbf24',
+      cardBorder: '#f59e0b',
+      cardBg: '#fffbeb',
+      cardTitleColor: '#92400e',
+      cardTextColor: '#78350f',
+    },
+    reminder: {
+      title: 'Action Reminder',
+      badge: 'OFFICIAL REMINDER',
+      ribbon: 'linear-gradient(90deg, #0369a1 0%, #0284c7 50%, #38bdf8 100%)',
+      badgeBg: 'rgba(2, 132, 199, 0.15)',
+      badgeBorder: 'rgba(2, 132, 199, 0.4)',
+      badgeColor: '#38bdf8',
+      cardBorder: '#0284c7',
+      cardBg: '#f0f9ff',
+      cardTitleColor: '#075985',
+      cardTextColor: '#0c4a6e',
+    },
+    warning: {
+      title: 'Formal Notice / Warning',
+      badge: 'FORMAL NOTICE',
+      ribbon: 'linear-gradient(90deg, #b91c1c 0%, #dc2626 50%, #f87171 100%)',
+      badgeBg: 'rgba(220, 38, 38, 0.15)',
+      badgeBorder: 'rgba(220, 38, 38, 0.4)',
+      badgeColor: '#f87171',
+      cardBorder: '#dc2626',
+      cardBg: '#fef2f2',
+      cardTitleColor: '#991b1b',
+      cardTextColor: '#7f1d1d',
+    },
+    appreciation: {
+      title: 'Recognition & Appreciation',
+      badge: 'STAFF APPRECIATION',
+      ribbon: 'linear-gradient(90deg, #047857 0%, #059669 50%, #34d399 100%)',
+      badgeBg: 'rgba(5, 150, 105, 0.15)',
+      badgeBorder: 'rgba(5, 150, 105, 0.4)',
+      badgeColor: '#34d399',
+      cardBorder: '#059669',
+      cardBg: '#ecfdf5',
+      cardTitleColor: '#065f46',
+      cardTextColor: '#064e3b',
+    },
+  }[type] || {
+    title: 'Branch Communication',
+    badge: 'OFFICIAL COMMUNICATION',
+    ribbon: 'linear-gradient(90deg, #b45309 0%, #d97706 50%, #f59e0b 100%)',
+    badgeBg: 'rgba(245, 158, 11, 0.15)',
+    badgeBorder: 'rgba(245, 158, 11, 0.4)',
+    badgeColor: '#fbbf24',
+    cardBorder: '#f59e0b',
+    cardBg: '#fffbeb',
+    cardTitleColor: '#92400e',
+    cardTextColor: '#78350f',
+  };
+
+  const escapedMessage = message.replace(/\n/g, '<br/>');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bank of Abyssinia - ${config.title}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f2f4; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f2f4; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Main Card Container -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0;">
+          
+          <!-- Top Accent Ribbon -->
+          <tr>
+            <td style="height: 6px; background: ${config.ribbon}; font-size: 0; line-height: 0;">&nbsp;</td>
+          </tr>
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #09090b; padding: 30px 36px; text-align: left;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <div style="font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #f59e0b; text-transform: uppercase; margin-bottom: 5px;">
+                      BANK OF ABYSSINIA
+                    </div>
+                    <div style="font-size: 19px; font-weight: 700; color: #ffffff; letter-spacing: -0.3px;">
+                      ${config.title}
+                    </div>
+                  </td>
+                  <td align="right" valign="middle">
+                    <div style="display: inline-block; padding: 5px 12px; background: ${config.badgeBg}; border: 1px solid ${config.badgeBorder}; border-radius: 9999px; color: ${config.badgeColor}; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">
+                      ${config.badge}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 34px 36px 28px 36px; background-color: #ffffff;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #3f3f46;">
+                Dear <strong style="color: #09090b;">${recipientName}</strong>,
+              </p>
+
+              <p style="margin: 0 0 20px 0; font-size: 14.5px; line-height: 1.6; color: #52525b;">
+                Branch management has issued an official communication regarding: <strong style="color: #09090b;">${subject}</strong>
+                ${periodLabel ? ` (Period: <strong>${periodLabel}</strong>)` : ''}
+              </p>
+
+              <!-- Highlighted Message Box -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${config.cardBg}; border-left: 4px solid ${config.cardBorder}; border-radius: 6px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 18px 20px;">
+                    <div style="font-size: 12px; font-weight: 700; color: ${config.cardTitleColor}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+                      Message from ${senderName}
+                    </div>
+                    <div style="font-size: 14px; line-height: 1.65; color: ${config.cardTextColor};">
+                      ${escapedMessage}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="margin-top: 20px; padding: 12px 16px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #f1f5f9; font-size: 12.5px; color: #64748b;">
+                🔒 <strong>Confidentiality Notice:</strong> This communication is recorded in the Branch Performance Management System and is strictly intended for the designated recipient.
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 36px; border-top: 1px solid #e2e8f0; text-align: center;">
+              <p style="margin: 0 0 4px 0; font-size: 12px; font-weight: 700; color: #475569;">
+                Bank of Abyssinia S.C. · ${branchName}
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+                Internal Branch Staff Performance Management System (PMS)
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+}
+
