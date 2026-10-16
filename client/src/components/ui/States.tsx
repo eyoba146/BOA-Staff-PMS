@@ -84,7 +84,7 @@ interface AlertProps {
 export function Alert({ tone = 'info', title, children, className, action }: AlertProps) {
   const { cls, icon: Icon } = ALERT[tone];
   return (
-    <div role={tone === 'danger' ? 'alert' : undefined} className={cn('flex gap-3 rounded-md border px-3.5 py-3 text-[13px]', cls, className)}>
+    <div role={tone === 'danger' ? 'alert' : undefined} className={cn('min-w-0 w-full flex gap-3 rounded-md border px-3.5 py-3 text-[13px]', cls, className)}>
       <Icon className="mt-px size-4 shrink-0" aria-hidden />
       <div className="min-w-0 flex-1 space-y-0.5">
         {title && <p className="font-medium">{title}</p>}

@@ -115,7 +115,7 @@ export function AnnouncementsPage() {
           return (
             <div className="space-y-6">
               {/* Category Filter Chips */}
-              <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 pb-3">
+              <div className="flex items-center gap-2 border-b border-zinc-200 pb-3 overflow-x-auto scrollbar-thin whitespace-nowrap">
                 <span className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 mr-2">
                   <Filter className="size-3.5" /> Filter by:
                 </span>
@@ -131,7 +131,7 @@ export function AnnouncementsPage() {
                       key={cat.id}
                       type="button"
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                      className={`inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
                         isActive
                           ? 'bg-ink-900 text-white'
                           : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900'

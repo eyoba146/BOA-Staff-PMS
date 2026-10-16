@@ -16,7 +16,7 @@ interface StatCardProps {
 /** Key figure card. Keep to ≤ 4 per row. */
 export function StatCard({ label, value, icon: Icon, meta, footer, loading, className }: StatCardProps) {
   return (
-    <Card className={cn('flex flex-col p-3 sm:p-4 lg:p-5', className)}>
+    <Card className={cn('min-w-0 w-full flex flex-col p-3 sm:p-4 lg:p-5', className)}>
       <div className="flex items-start justify-between gap-2 sm:gap-3">
         <p className="text-xs sm:text-[13px] font-medium text-zinc-500 leading-snug line-clamp-2">{label}</p>
         {Icon && (

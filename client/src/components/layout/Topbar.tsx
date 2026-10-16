@@ -14,7 +14,7 @@ export function Topbar({ onOpenMenu, counts }: { onOpenMenu: () => void; counts:
   const unread = counts.unreadAnnouncements ?? 0;
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 sm:h-16 items-center gap-2 sm:gap-3 border-b border-zinc-200 bg-white/95 px-3 sm:px-6 lg:px-8 backdrop-blur-sm">
+    <header className="sticky top-0 z-30 flex h-14 sm:h-16 w-full min-w-full items-center gap-2 sm:gap-3 border-b border-zinc-200 bg-white/95 px-3 sm:px-6 lg:px-8 backdrop-blur-sm">
       <IconButton label="Open navigation menu" onClick={onOpenMenu} className="-ml-1 sm:-ml-2 lg:hidden">
         <Menu className="size-5" />
       </IconButton>

@@ -234,11 +234,11 @@ export function StaffListPage() {
           return (
             <div className="space-y-6">
               {/* Navigation Tabs */}
-              <div className="flex items-center gap-1 border-b border-zinc-200">
+              <div className="flex items-center gap-1 border-b border-zinc-200 overflow-x-auto scrollbar-thin whitespace-nowrap">
                 <button
                   type="button"
                   onClick={() => handleTabChange('all')}
-                  className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
+                  className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
                     activeTab === 'all'
                       ? 'border-ink-900 text-ink-950 font-bold'
                       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'
@@ -254,7 +254,7 @@ export function StaffListPage() {
                 <button
                   type="button"
                   onClick={() => handleTabChange('pending')}
-                  className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
+                  className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
                     activeTab === 'pending'
                       ? 'border-gold-500 text-ink-950 font-bold'
                       : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'

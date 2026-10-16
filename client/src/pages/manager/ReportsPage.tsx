@@ -404,7 +404,7 @@ export function ReportsPage() {
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-600">
                     Staff Distribution Breakdown
                   </h3>
-                  <div className="flex items-center gap-4 text-xs font-medium">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs font-medium">
                     <span className="inline-flex items-center gap-1.5 text-emerald-700">
                       <span className="size-2 rounded-full bg-emerald-500" />
                       On Target: {summaryStats.onTargetCount} (
@@ -453,11 +453,11 @@ export function ReportsPage() {
             {/* ========================================================================= */}
             {/* Screen Navigation Tabs (Hidden during Print)                              */}
             {/* ========================================================================= */}
-            <div className="flex border-b border-zinc-200 print:hidden">
+            <div className="flex border-b border-zinc-200 overflow-x-auto scrollbar-thin whitespace-nowrap print:hidden">
               <button
                 type="button"
                 onClick={() => setActiveReportTab('staff')}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+                className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
                   activeReportTab === 'staff'
                     ? 'border-ink-950 text-ink-950'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
@@ -470,7 +470,7 @@ export function ReportsPage() {
               <button
                 type="button"
                 onClick={() => setActiveReportTab('kpi')}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+                className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
                   activeReportTab === 'kpi'
                     ? 'border-ink-950 text-ink-950'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
@@ -483,7 +483,7 @@ export function ReportsPage() {
               <button
                 type="button"
                 onClick={() => setActiveReportTab('campaign')}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+                className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
                   activeReportTab === 'campaign'
                     ? 'border-ink-950 text-ink-950'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
@@ -496,7 +496,7 @@ export function ReportsPage() {
               <button
                 type="button"
                 onClick={() => setActiveReportTab('executive')}
-                className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
+                className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer ${
                   activeReportTab === 'executive'
                     ? 'border-ink-950 text-ink-950'
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
@@ -524,14 +524,14 @@ export function ReportsPage() {
                     loadedReport.from
                   )} to ${formatDate(loadedReport.to)}`}
                   actions={
-                    <div className="flex flex-wrap items-center gap-2 print:hidden">
-                      <div className="relative w-56">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto print:hidden">
+                      <div className="relative w-full sm:w-56">
                         <Search className="absolute left-2.5 top-2.5 size-3.5 text-zinc-400" />
                         <Input
                           placeholder="Search staff or ID..."
                           value={staffSearch}
                           onChange={(e) => setStaffSearch(e.target.value)}
-                          className="h-8 pl-8 text-xs"
+                          className="h-8 pl-8 text-xs w-full"
                         />
                       </div>
                       <Select
@@ -539,7 +539,7 @@ export function ReportsPage() {
                         onChange={(e) =>
                           setStaffStatusFilter(e.target.value as 'all' | PerformanceStatus)
                         }
-                        className="h-8 w-36 text-xs"
+                        className="h-8 w-full sm:w-36 text-xs"
                       >
                         <option value="all">All Statuses</option>
                         <option value="on_target">On Target</option>

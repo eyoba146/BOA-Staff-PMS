@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/utils/cn';
 
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-lg border border-zinc-200 bg-white shadow-card', className)} {...rest} />;
+  return <div className={cn('min-w-0 w-full max-w-full overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-card', className)} {...rest} />;
 }
 
 interface CardHeaderProps {
@@ -17,7 +17,7 @@ interface CardHeaderProps {
 
 export function CardHeader({ title, description, actions, icon, className, as: Heading = 'h2' }: CardHeaderProps) {
   return (
-    <div className={cn('flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3.5 sm:px-5', className)}>
+    <div className={cn('flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3.5 sm:px-5', className)}>
       <div className="flex min-w-0 items-start gap-3">
         {icon && <span className="mt-0.5 text-zinc-500 [&>svg]:size-[18px]">{icon}</span>}
         <div className="min-w-0">
@@ -25,7 +25,7 @@ export function CardHeader({ title, description, actions, icon, className, as: H
           {description && <p className="mt-0.5 text-[13px] text-zinc-500">{description}</p>}
         </div>
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full sm:w-auto shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { cn } from '@/utils/cn';
 /** Scroll container + table. Use `hideBelow` on low-priority columns for small screens. */
 export function Table({ className, children, caption }: { className?: string; children: ReactNode; caption?: string }) {
   return (
-    <div className={cn('overflow-x-auto scrollbar-thin', className)}>
+    <div className={cn('min-w-0 w-full max-w-full overflow-x-auto scrollbar-thin', className)}>
       <table className="w-full min-w-full border-collapse text-left text-sm">
         {caption && <caption className="sr-only">{caption}</caption>}
         {children}

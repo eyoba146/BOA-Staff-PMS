@@ -34,7 +34,7 @@ export function AppLayout() {
   }, [pathname]);
 
   return (
-    <div className="min-h-dvh lg:pl-72 print:pl-0 print:min-h-0">
+    <div className="min-h-dvh w-full max-w-full overflow-x-hidden lg:pl-72 print:pl-0 print:min-h-0">
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-ink-900 px-3 py-2 text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3 print:hidden"
@@ -59,12 +59,12 @@ export function AppLayout() {
         <Sidebar counts={counts} onNavigate={() => setDrawerOpen(false)} />
       </dialog>
 
-      <div className="flex min-h-dvh flex-col print:min-h-0 print:block">
-        <div className="print:hidden">
+      <div className="flex min-h-dvh min-w-0 w-full max-w-full flex-col overflow-x-hidden print:min-h-0 print:block">
+        <div className="w-full shrink-0 print:hidden">
           <Topbar onOpenMenu={() => setDrawerOpen(true)} counts={counts} />
         </div>
-        <main id="main" tabIndex={-1} className="flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 outline-none print:p-0 print:overflow-visible">
-          <div className="mx-auto w-full max-w-[1440px] print:max-w-none">
+        <main id="main" tabIndex={-1} className="flex-1 min-w-0 w-full max-w-full px-3 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8 outline-none print:p-0 print:overflow-visible">
+          <div className="mx-auto w-full max-w-[1440px] min-w-0 print:max-w-none">
             <Outlet />
           </div>
         </main>
