@@ -1,15 +1,11 @@
-import { Loader2 } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import type { Role } from '@/types';
 import { homeFor, paths } from './paths';
+import BankLoader from '@/BankLoader';
 
 function FullPageLoader() {
-  return (
-    <div className="flex min-h-dvh items-center justify-center" role="status" aria-label="Loading">
-      <Loader2 className="size-6 animate-spin text-zinc-400" />
-    </div>
-  );
+  return <BankLoader />;
 }
 
 /** Requires an authenticated session. UX only — the backend must enforce authorization (SRS FR-18). */

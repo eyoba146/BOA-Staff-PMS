@@ -1,7 +1,6 @@
-
-export default function BankLoader() {
+export function BankLoader() {
   return (
-    <div className="bank-loader">
+    <div className="bank-loader" role="status" aria-label="Loading">
       <div className="bank-loader__content">
         <div className="bank-loader__container">
           <div className="bank-loader__ring" />
@@ -21,3 +20,5 @@ export default function BankLoader() {
     </div>
   );
 }
+
+export default BankLoader;
