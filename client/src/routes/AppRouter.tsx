@@ -35,6 +35,10 @@ import { ManagerFeedbackPage } from '@/pages/manager/ManagerFeedbackPage';
 import { ManagerAnnouncementsPage } from '@/pages/manager/ManagerAnnouncementsPage';
 import { SettingsPage } from '@/pages/manager/SettingsPage';
 
+// Customer Experience Manager pages
+import { CemDashboardPage } from '@/pages/cem/CemDashboardPage';
+import { CemStaffListPage } from '@/pages/cem/CemStaffListPage';
+
 export function AppRouter() {
   return (
     <Routes>
@@ -65,6 +69,16 @@ export function AppRouter() {
             <Route path={paths.staff.announcements} element={<AnnouncementsPage />} />
             <Route path={paths.staff.chat} element={<ChatPage />} />
             <Route path={paths.staff.profile} element={<ProfilePage />} />
+          </Route>
+
+          {/* Customer Experience Manager Portal */}
+          <Route element={<RequireRole role="customer_experience_manager" />}>
+            <Route path={paths.cem.dashboard} element={<CemDashboardPage />} />
+            <Route path={paths.cem.staff} element={<CemStaffListPage />} />
+            <Route path="/cem/staff/:staffId" element={<StaffDetailPage />} />
+            <Route path={paths.cem.feedback} element={<ManagerFeedbackPage />} />
+            <Route path={paths.cem.chat} element={<ChatPage />} />
+            <Route path={paths.cem.profile} element={<ProfilePage />} />
           </Route>
 
           {/* Manager Portal */}

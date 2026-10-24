@@ -29,6 +29,12 @@ export interface StaffService {
   verifyEmailChange(newEmail: string, code: string): Promise<User>;
   /** Permanently delete staff member and associated records (Manager only). */
   delete(id: string): Promise<void>;
+  /** Customer Experience Manager management */
+  listCem(): Promise<User[]>;
+  listInScope(): Promise<User[]>;
+  assignCem(id: string, scope?: { scopeType?: string; allowedPositions?: string[]; allowedStaffIds?: string[] }): Promise<User>;
+  revokeCem(id: string): Promise<User>;
+  updateCemScope(id: string, scope: { scopeType: string; allowedPositions?: string[]; allowedStaffIds?: string[] }): Promise<any>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -45,6 +51,11 @@ const httpStaffService: StaffService = {
   requestEmailChange: (newEmail) => api.post('/staff/email/request', { newEmail }),
   verifyEmailChange: (newEmail, code) => api.post<User>('/staff/email/verify', { newEmail, code }),
   delete: (id) => api.delete<void>(`/staff/${id}`),
+  listCem: () => api.get<User[]>('/staff/cem'),
+  listInScope: () => api.get<User[]>('/staff/in-scope'),
+  assignCem: (id, scope) => api.post<User>(`/staff/${id}/assign-cem`, scope ?? {}),
+  revokeCem: (id) => api.post<User>(`/staff/${id}/revoke-cem`),
+  updateCemScope: (id, scope) => api.patch(`/staff/${id}/cem-scope`, scope),
 };
 
 // ---------------- Mock adapter ----------------
@@ -214,6 +225,38 @@ const mockStaffService: StaffService = {
     db.entries = db.entries.filter((e) => e.staffId !== id);
     db.feedback = db.feedback.filter((f) => f.staffId !== id && f.managerId !== id);
     commit();
+  },
+  async listCem() {
+    await delay();
+    return getDb()
+      .users.filter((u) => u.role === 'customer_experience_manager')
+      .map(toPublicUser);
+  },
+  async listInScope() {
+    await delay();
+    return getDb()
+      .users.filter((u) => u.role === 'staff' && u.status === 'active')
+      .map(toPublicUser);
+  },
+  async assignCem(id: string) {
+    await delay();
+    const user = getDb().users.find((u) => u.id === id);
+    if (!user) throw mockError(404, 'NOT_FOUND', 'User not found');
+    user.role = 'customer_experience_manager';
+    commit();
+    return toPublicUser(user);
+  },
+  async revokeCem(id: string) {
+    await delay();
+    const user = getDb().users.find((u) => u.id === id);
+    if (!user) throw mockError(404, 'NOT_FOUND', 'User not found');
+    user.role = 'staff';
+    commit();
+    return toPublicUser(user);
+  },
+  async updateCemScope() {
+    await delay();
+    return { success: true };
   },
 };
 

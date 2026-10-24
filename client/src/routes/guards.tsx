@@ -17,9 +17,10 @@ export function RequireAuth() {
   return <Outlet />;
 }
 
-export function RequireRole({ role }: { role: Role }) {
+export function RequireRole({ role, roles }: { role?: Role; roles?: Role[] }) {
   const { user } = useAuth();
-  if (user && user.role !== role) return <Navigate to={paths.forbidden} replace />;
+  const allowed = roles ?? (role ? [role] : []);
+  if (user && !allowed.includes(user.role)) return <Navigate to={paths.forbidden} replace />;
   return <Outlet />;
 }
 

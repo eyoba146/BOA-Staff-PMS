@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { staffController } from './staff.controller.js';
-import { requireAuth, requireManager } from '../../middlewares/auth.middleware.js';
+import { requireAuth, requireManager, requireManagerOrCem } from '../../middlewares/auth.middleware.js';
 import { validateBody } from '../../middlewares/validate.middleware.js';
 import {
   approveStaffSchema,
@@ -33,11 +33,19 @@ staffRouter.post(
   staffController.verifyEmailChange,
 );
 
+// Customer Experience Manager scope listing & role management
+staffRouter.get('/cem', requireAuth, requireManager, staffController.listCem);
+staffRouter.get('/in-scope', requireAuth, requireManagerOrCem, staffController.listInScope);
+
 // Manager-only approvals and staff oversight
 staffRouter.get('/pending', requireAuth, requireManager, staffController.listPending);
 staffRouter.get('/next-employee-id', requireAuth, requireManager, staffController.getNextEmployeeId);
 staffRouter.get('/', requireAuth, requireManager, staffController.list);
-staffRouter.get('/:id', requireAuth, requireManager, staffController.getById);
+staffRouter.get('/:id', requireAuth, requireManagerOrCem, staffController.getById);
+
+staffRouter.post('/:id/assign-cem', requireAuth, requireManager, staffController.assignCem);
+staffRouter.post('/:id/revoke-cem', requireAuth, requireManager, staffController.revokeCem);
+staffRouter.patch('/:id/cem-scope', requireAuth, requireManager, staffController.updateCemScope);
 
 staffRouter.post(
   '/:id/approve',

@@ -3,7 +3,7 @@ import type { CommunicationAudience, CommunicationType, FeedbackInput, Kpi, Perf
 import { Dialog, Button, Field, Input, Select, Textarea } from '@/components/ui';
 import { required, validateForm, hasErrors } from '@/utils/validation';
 import { PERIOD_LABELS } from '@/utils/date';
-import { Users, User as UserIcon, Send, AlertTriangle, Bell, Award, MessageSquare } from 'lucide-react';
+import { Users, User as UserIcon, Send, AlertTriangle, Bell, Award, MessageSquare, Lock } from 'lucide-react';
 
 interface GiveFeedbackDialogProps {
   open: boolean;
@@ -34,6 +34,8 @@ export function GiveFeedbackDialog({
   const [audience, setAudience] = useState<CommunicationAudience>('recipient_only');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [suggestedAction, setSuggestedAction] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
   const [period, setPeriod] = useState<PerformancePeriod | ''>(defaultPeriod ?? '');
   const [periodLabel, setPeriodLabel] = useState(defaultPeriodLabel ?? '');
   const [kpiId, setKpiId] = useState(defaultKpiId ?? '');
@@ -56,6 +58,8 @@ export function GiveFeedbackDialog({
     setKpiId(defaultKpiId ?? '');
     setSubject('');
     setMessage('');
+    setSuggestedAction('');
+    setFollowUpDate('');
     setErrors({});
   }, [open, defaultStaffId, defaultPeriod, defaultPeriodLabel, defaultKpiId, staffList]);
 
@@ -84,6 +88,8 @@ export function GiveFeedbackDialog({
         audience,
         subject: subject.trim(),
         message: message.trim(),
+        suggestedAction: suggestedAction.trim() || undefined,
+        followUpDate: followUpDate || undefined,
         period: (period as PerformancePeriod) || null,
         periodLabel: periodLabel.trim() || (period ? PERIOD_LABELS[period as PerformancePeriod] : null),
         kpiId: kpiId || null,
@@ -241,8 +247,26 @@ export function GiveFeedbackDialog({
           />
         </Field>
 
+        {/* Suggested Action and Follow Up Date for Coaching */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Suggested Improvement Action (Optional)">
+            <Input
+              value={suggestedAction}
+              onChange={(e) => setSuggestedAction(e.target.value)}
+              placeholder="e.g. Conduct daily teller audit review"
+            />
+          </Field>
+          <Field label="Follow-Up Target Date (Optional)">
+            <Input
+              type="date"
+              value={followUpDate}
+              onChange={(e) => setFollowUpDate(e.target.value)}
+            />
+          </Field>
+        </div>
+
         <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/80 p-3 text-[11.5px] text-zinc-500 flex items-start gap-2">
-          <span className="text-zinc-700 font-semibold mt-px">🔒 Notice:</span>
+          <Lock className="size-3.5 text-zinc-700 mt-0.5 shrink-0" />
           <span>
             {recipientMode === 'all'
               ? 'This communication will be securely dispatched to each individual employee with in-app alert and transactional email delivery.'

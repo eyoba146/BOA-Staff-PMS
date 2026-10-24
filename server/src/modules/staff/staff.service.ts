@@ -9,6 +9,8 @@ import { recordAudit } from '../audit/audit.service.js';
 import { verificationRepository } from '../../repositories/verification.repository.js';
 import { generateVerificationCode } from '../../utils/code.js';
 import { invalidateOverviewCache } from '../performance/performance.service.js';
+import { prisma } from '../../config/database.js';
+import { getStaffIdsInScope } from '../../utils/scope.js';
 
 let cachedStaffList: PublicUser[] | null = null;
 let cachedStaffListTime = 0;
@@ -45,7 +47,7 @@ export const staffService = {
       if (match) return match;
     }
     const user = await userRepository.findById(id);
-    if (!user || user.role !== 'staff') {
+    if (!user || (user.role !== 'staff' && user.role !== 'customer_experience_manager')) {
       throw ApiError.notFound('Staff member not found.');
     }
     if (user.status === 'pending_email_verification') {
@@ -252,7 +254,7 @@ export const staffService = {
     }
 
     const staff = await userRepository.findById(userId);
-    if (!staff || staff.role !== 'staff') {
+    if (!staff || (staff.role !== 'staff' && staff.role !== 'customer_experience_manager')) {
       throw ApiError.notFound('Staff account not found.');
     }
 
@@ -358,7 +360,7 @@ export const staffService = {
 
   async delete(id: string, managerId?: string, ipAddress?: string): Promise<void> {
     const user = await userRepository.findById(id);
-    if (!user || user.role !== 'staff') {
+    if (!user || (user.role !== 'staff' && user.role !== 'customer_experience_manager')) {
       throw ApiError.notFound('Staff member not found.');
     }
 
@@ -376,5 +378,126 @@ export const staffService = {
 
     invalidateOverviewCache();
     invalidateStaffCache();
+  },
+
+  async assignCem(
+    staffId: string,
+    managerId: string,
+    scopeData?: { scopeType?: string; allowedPositions?: string[]; allowedStaffIds?: string[] },
+    ipAddress?: string,
+  ): Promise<PublicUser> {
+    const user = await userRepository.findById(staffId);
+    if (!user) {
+      throw ApiError.notFound('Staff member not found.');
+    }
+    if (user.status !== 'active') {
+      throw ApiError.badRequest('Only active staff members can be assigned as Customer Experience Manager.');
+    }
+    if (user.role === 'manager') {
+      throw ApiError.badRequest('Cannot reassign branch administrator.');
+    }
+
+    const updated = await userRepository.assignCemRole(staffId, managerId, scopeData);
+    if (!updated) {
+      throw ApiError.internal('Could not assign Customer Experience Manager role.');
+    }
+
+    await prisma.notification.create({
+      data: {
+        userId: staffId,
+        title: 'Customer Experience Manager Role Assigned',
+        message: 'You have been assigned the Customer Experience Manager role with staff coaching and group moderation capabilities.',
+        type: 'info',
+        link: '/cem/dashboard',
+      },
+    }).catch(() => {});
+
+    await recordAudit({
+      action: 'CEM_ROLE_ASSIGNED',
+      actorId: managerId,
+      details: {
+        targetStaffId: staffId,
+        targetEmail: user.email,
+        scope: scopeData || { scopeType: 'branch' },
+      },
+      ipAddress,
+    });
+
+    invalidateStaffCache();
+    return toPublicUser(updated);
+  },
+
+  async revokeCem(staffId: string, managerId: string, ipAddress?: string): Promise<PublicUser> {
+    const user = await userRepository.findById(staffId);
+    if (!user) {
+      throw ApiError.notFound('Staff member not found.');
+    }
+    if (user.role !== 'customer_experience_manager') {
+      throw ApiError.badRequest('This account does not hold the Customer Experience Manager role.');
+    }
+
+    const updated = await userRepository.revokeCemRole(staffId, managerId);
+    if (!updated) {
+      throw ApiError.internal('Could not revoke Customer Experience Manager role.');
+    }
+
+    await prisma.notification.create({
+      data: {
+        userId: staffId,
+        title: 'Customer Experience Manager Role Revoked',
+        message: 'Your Customer Experience Manager role has been revoked. Your account has returned to standard staff status.',
+        type: 'warning',
+        link: '/staff/dashboard',
+      },
+    }).catch(() => {});
+
+    await recordAudit({
+      action: 'CEM_ROLE_REVOKED',
+      actorId: managerId,
+      details: { targetStaffId: staffId, targetEmail: user.email },
+      ipAddress,
+    });
+
+    invalidateStaffCache();
+    return toPublicUser(updated);
+  },
+
+  async updateCemScope(
+    staffId: string,
+    managerId: string,
+    scopeData: { scopeType?: string; allowedPositions?: string[]; allowedStaffIds?: string[] },
+    ipAddress?: string,
+  ) {
+    const user = await userRepository.findById(staffId);
+    if (!user || user.role !== 'customer_experience_manager') {
+      throw ApiError.badRequest('Staff member is not an active Customer Experience Manager.');
+    }
+
+    const scope = await userRepository.updateCemScope(staffId, scopeData);
+
+    await recordAudit({
+      action: 'CEM_SCOPE_UPDATED',
+      actorId: managerId,
+      details: { targetStaffId: staffId, scope: scopeData },
+      ipAddress,
+    });
+
+    return scope;
+  },
+
+  async listCem() {
+    return userRepository.listCemUsers();
+  },
+
+  async listStaffInScope(managerUser: { id: string; role: string }): Promise<PublicUser[]> {
+    const ids = await getStaffIdsInScope(managerUser);
+    const users = await prisma.user.findMany({
+      where: {
+        id: { in: ids },
+        status: 'active',
+      },
+      orderBy: { fullName: 'asc' },
+    });
+    return users.map(toPublicUser);
   },
 };

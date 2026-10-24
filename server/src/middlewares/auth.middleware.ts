@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../utils/apiError.js';
 import { verifyAccessToken } from '../utils/jwt.js';
+import { userRepository } from '../repositories/user.repository.js';
+
+export type UserRole = 'staff' | 'manager' | 'customer_experience_manager';
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
@@ -35,22 +38,45 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
 export const authenticate = requireAuth;
 
-export function requireRole(role: 'staff' | 'manager') {
-  return (req: Request, res: Response, next: NextFunction) => {
-    requireAuth(req, res, () => {
-      if (!req.user || req.user.status !== 'active') {
-        throw ApiError.forbidden('Your account is not active.');
+export function requireRole(...roles: UserRole[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    requireAuth(req, res, async () => {
+      try {
+        if (!req.user || req.user.status !== 'active') {
+          throw ApiError.forbidden('Your account is not active.');
+        }
+
+        const userId = req.user.id || req.user.userId || '';
+        if (!userId) {
+          throw ApiError.unauthorized('Invalid authentication credentials.');
+        }
+
+        // Live check from database for immediate role revocation guarantee
+        const dbUser = await userRepository.findById(userId);
+        if (!dbUser || dbUser.status !== 'active') {
+          throw ApiError.forbidden('Your account is not active.');
+        }
+
+        const effectiveRole = dbUser.role as UserRole;
+        req.user.role = effectiveRole;
+
+        if (!roles.includes(effectiveRole)) {
+          throw ApiError.forbidden('You do not have the required role for this operation.');
+        }
+        next();
+      } catch (err) {
+        next(err);
       }
-      if (req.user.role !== role) {
-        throw ApiError.forbidden(`${role.charAt(0).toUpperCase() + role.slice(1)} authorization required for this operation.`);
-      }
-      next();
     });
   };
 }
 
 export function requireManager(req: Request, res: Response, next: NextFunction): void {
   requireRole('manager')(req, res, next);
+}
+
+export function requireManagerOrCem(req: Request, res: Response, next: NextFunction): void {
+  requireRole('manager', 'customer_experience_manager')(req, res, next);
 }
 
 export function requireActive(req: Request, res: Response, next: NextFunction): void {

@@ -31,6 +31,18 @@ export const paths = {
     chat: '/manager/chat',
     settings: '/manager/settings',
   },
+  cem: {
+    dashboard: '/cem/dashboard',
+    staff: '/cem/staff',
+    staffDetail: (id: string) => `/cem/staff/${id}`,
+    feedback: '/cem/feedback',
+    chat: '/cem/chat',
+    profile: '/cem/profile',
+  },
 } as const;
 
-export const homeFor = (role: Role) => (role === 'manager' ? paths.manager.dashboard : paths.staff.dashboard);
+export const homeFor = (role: Role) => {
+  if (role === 'manager') return paths.manager.dashboard;
+  if (role === 'customer_experience_manager') return paths.cem.dashboard;
+  return paths.staff.dashboard;
+};

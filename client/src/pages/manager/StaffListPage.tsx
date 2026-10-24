@@ -50,27 +50,38 @@ import { toApiError } from '@/services/http/apiClient';
 export function StaffListPage() {
   const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'pending' ? 'pending' : 'all';
-  const [activeTab, setActiveTab] = useState<'all' | 'pending'>(initialTab);
+  const initialTab = searchParams.get('tab') === 'pending' ? 'pending' : searchParams.get('tab') === 'cem' ? 'cem' : 'all';
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'cem'>(initialTab);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [pendingSearch, setPendingSearch] = useState('');
   const [copiedRef, setCopiedRef] = useState<string | null>(null);
   const [copiedRegister, setCopiedRegister] = useState(false);
 
+  // Customer Experience Manager controls
+  const [assignCemUser, setAssignCemUser] = useState<User | null>(null);
+  const [cemScopeType, setCemScopeType] = useState<'branch' | 'positions' | 'staff'>('branch');
+  const [cemAllowedPositions, setCemAllowedPositions] = useState<string[]>([]);
+  const [cemAllowedStaffIds, setCemAllowedStaffIds] = useState<string[]>([]);
+  const [savingCem, setSavingCem] = useState(false);
+  const [revokeCemUser, setRevokeCemUser] = useState<User | null>(null);
+  const [revokingCem, setRevokingCem] = useState(false);
+
   // Sync tab with URL search parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'pending' && activeTab !== 'pending') {
       setActiveTab('pending');
+    } else if (tabParam === 'cem' && activeTab !== 'cem') {
+      setActiveTab('cem');
     } else if (tabParam === 'all' && activeTab !== 'all') {
       setActiveTab('all');
     }
   }, [searchParams, activeTab]);
 
-  const handleTabChange = (tab: 'all' | 'pending') => {
+  const handleTabChange = (tab: 'all' | 'pending' | 'cem') => {
     setActiveTab(tab);
-    setSearchParams(tab === 'pending' ? { tab: 'pending' } : {});
+    setSearchParams(tab === 'all' ? {} : { tab });
   };
 
   // Approval / rejection state
@@ -253,6 +264,22 @@ export function StaffListPage() {
 
                 <button
                   type="button"
+                  onClick={() => handleTabChange('cem')}
+                  className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
+                    activeTab === 'cem'
+                      ? 'border-gold-500 text-ink-950 font-bold'
+                      : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'
+                  }`}
+                >
+                  <ShieldCheck className="size-4 text-gold-600" />
+                  <span>Customer Experience Managers</span>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                    {allStaff.filter((s) => s.role === 'customer_experience_manager').length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleTabChange('pending')}
                   className={`flex items-center gap-2 shrink-0 whitespace-nowrap border-b-2 px-5 py-3 text-sm font-semibold transition-all ${
                     activeTab === 'pending'
@@ -401,6 +428,44 @@ export function StaffListPage() {
                               </TD>
                               <TD align="right">
                                 <div className="flex items-center justify-end gap-1.5">
+                                  {staff.role === 'customer_experience_manager' ? (
+                                    <>
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => {
+                                          setAssignCemUser(staff);
+                                          setCemScopeType(staff.scope?.scopeType || 'branch');
+                                          setCemAllowedPositions(staff.scope?.allowedPositions || []);
+                                          setCemAllowedStaffIds(staff.scope?.allowedStaffIds || []);
+                                        }}
+                                      >
+                                        Scope
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-amber-700 hover:bg-amber-50"
+                                        onClick={() => setRevokeCemUser(staff)}
+                                      >
+                                        Revoke CEM
+                                      </Button>
+                                    </>
+                                  ) : staff.status === 'active' ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-gold-700 hover:bg-gold-50"
+                                      onClick={() => {
+                                        setAssignCemUser(staff);
+                                        setCemScopeType('branch');
+                                        setCemAllowedPositions([]);
+                                        setCemAllowedStaffIds([]);
+                                      }}
+                                    >
+                                      Assign CEM
+                                    </Button>
+                                  ) : null}
                                   <Link to={paths.manager.staffDetail(staff.id)}>
                                     <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
                                       Profile
@@ -420,6 +485,102 @@ export function StaffListPage() {
                               </TD>
                             </TR>
                           ))}
+                        </TBody>
+                      </Table>
+                    </Card>
+                  )}
+                </div>
+              ) : activeTab === 'cem' ? (
+                <div className="space-y-4">
+                  {/* CEM Header */}
+                  <div className="rounded-xl border border-amber-200/90 bg-amber-50/50 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gold-500 text-ink-950 font-bold">
+                        <ShieldCheck className="size-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-ink-950">Customer Experience Managers</h4>
+                        <p className="mt-0.5 text-xs text-zinc-600">
+                          Customer Experience Managers interpret KPI results, provide coaching and feedback, and moderate authorized group chats within their permitted branch scope. They cannot alter KPI formulas, targets, or submitted entries.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {allStaff.filter((s) => s.role === 'customer_experience_manager').length === 0 ? (
+                    <Card>
+                      <EmptyState
+                        icon={ShieldCheck}
+                        title="No Customer Experience Managers assigned"
+                        description="Promote eligible branch officers from the All Staff tab to grant scoped KPI coaching and group chat moderation authority."
+                      />
+                    </Card>
+                  ) : (
+                    <Card>
+                      <Table>
+                        <THead>
+                          <TR>
+                            <TH>Manager</TH>
+                            <TH>Current Position</TH>
+                            <TH>Branch</TH>
+                            <TH>Supervisory Scope</TH>
+                            <TH align="right">Actions</TH>
+                          </TR>
+                        </THead>
+                        <TBody>
+                          {allStaff
+                            .filter((s) => s.role === 'customer_experience_manager')
+                            .map((cem) => (
+                              <TR key={cem.id} interactive>
+                                <TD>
+                                  <Link
+                                    to={paths.manager.staffDetail(cem.id)}
+                                    className="flex items-center gap-2.5 hover:underline"
+                                  >
+                                    <Avatar name={cem.fullName} src={cem.avatarUrl} size="sm" />
+                                    <div>
+                                      <span className="font-semibold text-zinc-900 block">{cem.fullName}</span>
+                                      <span className="text-[11px] text-zinc-400 block">{cem.employeeId}</span>
+                                    </div>
+                                  </Link>
+                                </TD>
+                                <TD className="text-xs text-zinc-700">{cem.position}</TD>
+                                <TD className="text-xs text-zinc-500">{cem.branchName}</TD>
+                                <TD>
+                                  <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900">
+                                    {cem.scope?.scopeType === 'positions'
+                                      ? `Positions: ${cem.scope.allowedPositions?.join(', ') || 'None selected'}`
+                                      : cem.scope?.scopeType === 'staff'
+                                      ? `Selected Staff: ${cem.scope.allowedStaffIds?.length || 0} officers`
+                                      : 'Full Branch Scope'}
+                                  </span>
+                                </TD>
+                                <TD align="right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      onClick={() => {
+                                        setAssignCemUser(cem);
+                                        setCemScopeType(cem.scope?.scopeType || 'branch');
+                                        setCemAllowedPositions(cem.scope?.allowedPositions || []);
+                                        setCemAllowedStaffIds(cem.scope?.allowedStaffIds || []);
+                                      }}
+                                    >
+                                      Configure Scope
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                      onClick={() => setRevokeCemUser(cem)}
+                                    >
+                                      Revoke Role
+                                    </Button>
+                                  </div>
+                                </TD>
+                              </TR>
+                            ))}
                         </TBody>
                       </Table>
                     </Card>
@@ -804,6 +965,155 @@ export function StaffListPage() {
         confirmLabel="Delete Account"
         destructive
         loading={deleting}
+      />
+
+      {/* Configure CEM Scope Dialog */}
+      <Dialog
+        open={Boolean(assignCemUser)}
+        onClose={() => setAssignCemUser(null)}
+        title={assignCemUser?.role === 'customer_experience_manager' ? 'Configure Manager Scope' : 'Assign Customer Experience Manager'}
+        description={`Set supervision scope for ${assignCemUser?.fullName} (${assignCemUser?.position || 'Staff'}). The manager will only be permitted to monitor KPIs, give coaching, and moderate group chats within this scope.`}
+        size="md"
+        busy={savingCem}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setAssignCemUser(null)} disabled={savingCem}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={savingCem}
+              onClick={async () => {
+                if (!assignCemUser) return;
+                setSavingCem(true);
+                try {
+                  await staffService.assignCem(assignCemUser.id, {
+                    scopeType: cemScopeType,
+                    allowedPositions: cemAllowedPositions,
+                    allowedStaffIds: cemAllowedStaffIds,
+                  });
+                  showToast({
+                    tone: 'gold',
+                    title: 'Role Configured',
+                    message: `${assignCemUser.fullName} configured as Customer Experience Manager with ${cemScopeType} scope.`,
+                  });
+                  setAssignCemUser(null);
+                  void state.reload();
+                } catch (err: any) {
+                  showToast({ tone: 'danger', title: 'Error', message: err?.message || 'Failed to save Customer Experience Manager scope.' });
+                } finally {
+                  setSavingCem(false);
+                }
+              }}
+            >
+              Save Scope & Role
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 py-2">
+          <Field label="Scope Type">
+            <Select
+              value={cemScopeType}
+              onChange={(e) => setCemScopeType(e.target.value as any)}
+            >
+              <option value="branch">Branch-Wide Scope (All Active Branch Staff)</option>
+              <option value="positions">Specific Job Positions</option>
+              <option value="staff">Individual Staff Members</option>
+            </Select>
+          </Field>
+
+          {cemScopeType === 'positions' && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-zinc-900">Allowed Job Positions</label>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 p-2.5 bg-zinc-50/50">
+                {Array.from(new Set((state.data?.allStaff || []).map((s: User) => s.position).filter(Boolean))).map((pos) => {
+                  const checked = cemAllowedPositions.includes(pos);
+                  return (
+                    <label key={pos} className="flex items-center gap-2 text-xs text-zinc-700 cursor-pointer p-1 rounded hover:bg-white">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setCemAllowedPositions([...cemAllowedPositions, pos]);
+                          } else {
+                            setCemAllowedPositions(cemAllowedPositions.filter((p) => p !== pos));
+                          }
+                        }}
+                        className="rounded border-zinc-300 text-gold-600 focus:ring-gold-500"
+                      />
+                      <span>{pos}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {cemScopeType === 'staff' && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-zinc-900">Allowed Staff Members</label>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 p-2.5 bg-zinc-50/50">
+                {(state.data?.allStaff || [])
+                  .filter((s: User) => s.id !== assignCemUser?.id && s.status === 'active')
+                  .map((s: User) => {
+                    const checked = cemAllowedStaffIds.includes(s.id);
+                    return (
+                      <label key={s.id} className="flex items-center gap-2 text-xs text-zinc-700 cursor-pointer p-1 rounded hover:bg-white">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setCemAllowedStaffIds([...cemAllowedStaffIds, s.id]);
+                            } else {
+                              setCemAllowedStaffIds(cemAllowedStaffIds.filter((id) => id !== s.id));
+                            }
+                          }}
+                          className="rounded border-zinc-300 text-gold-600 focus:ring-gold-500"
+                        />
+                        <span>{s.fullName} ({s.position})</span>
+                      </label>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900">
+            <strong>Mandatory Governance:</strong> Role assignments and scope modifications are auditable. The Customer Experience Manager cannot elevate their own role or modify other managers.
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Revoke CEM Dialog */}
+      <ConfirmDialog
+        open={Boolean(revokeCemUser)}
+        onCancel={() => setRevokeCemUser(null)}
+        onConfirm={async () => {
+          if (!revokeCemUser) return;
+          setRevokingCem(true);
+          try {
+            await staffService.revokeCem(revokeCemUser.id);
+            showToast({
+              tone: 'gold',
+              title: 'Role Revoked',
+              message: `Revoked Customer Experience Manager role from ${revokeCemUser.fullName}.`,
+            });
+            setRevokeCemUser(null);
+            void state.reload();
+          } catch (err: any) {
+            showToast({ tone: 'danger', title: 'Revoke Error', message: err?.message || 'Failed to revoke Customer Experience Manager role.' });
+          } finally {
+            setRevokingCem(false);
+          }
+        }}
+        title="Revoke Customer Experience Manager Role"
+        description={`Are you sure you want to revoke Customer Experience Manager authority from ${revokeCemUser?.fullName}? Their account will immediately revert to standard staff permissions, and any open manager sessions will lose elevated privileges immediately.`}
+        confirmLabel="Revoke CEM Role"
+        destructive
+        loading={revokingCem}
       />
     </div>
   );

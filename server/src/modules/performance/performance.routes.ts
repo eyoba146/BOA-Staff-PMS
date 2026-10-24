@@ -9,11 +9,11 @@ performanceRoutes.get('/me', authenticate, performanceController.getMySummary);
 performanceRoutes.get('/me/trend', authenticate, performanceController.getMyTrend);
 performanceRoutes.get('/me/dashboard', authenticate, performanceController.getMyDashboard);
 
-// Branch overview (Manager only)
-performanceRoutes.get('/branch', authenticate, requireRole('manager'), performanceController.getBranchOverview);
+// Branch overview (Manager and Customer Experience Manager)
+performanceRoutes.get('/branch', authenticate, requireRole('manager', 'customer_experience_manager'), performanceController.getBranchOverview);
 
-// Branch consolidated report (Manager only)
-performanceRoutes.get('/report', authenticate, requireRole('manager'), performanceController.getReport);
+// Branch consolidated report (Manager and Customer Experience Manager)
+performanceRoutes.get('/report', authenticate, requireRole('manager', 'customer_experience_manager'), performanceController.getReport);
 
 // Individual staff summary & trend
 performanceRoutes.get('/staff/:staffId', authenticate, performanceController.getStaffSummary);

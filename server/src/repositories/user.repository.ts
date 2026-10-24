@@ -11,7 +11,7 @@ export interface StoredUser {
   phone: string;
   position: string;
   branchName: string;
-  role: 'staff' | 'manager';
+  role: 'staff' | 'manager' | 'customer_experience_manager';
   status: 'pending_email_verification' | 'pending_approval' | 'active' | 'rejected' | 'deactivated';
   passwordHash: string;
   emailVerified: boolean;
@@ -32,7 +32,7 @@ export interface CreateUserData {
   branchName?: string;
   passwordHash: string;
   referenceId: string;
-  role?: 'staff' | 'manager';
+  role?: 'staff' | 'manager' | 'customer_experience_manager';
   status?: StoredUser['status'];
 }
 
@@ -156,7 +156,7 @@ function mapPrismaUser(u: any): StoredUser {
     phone: u.phone,
     position: u.positionTitle,
     branchName: u.branchName,
-    role: u.role as 'staff' | 'manager',
+    role: u.role as 'staff' | 'manager' | 'customer_experience_manager',
     status: u.status as StoredUser['status'],
     passwordHash: u.password,
     emailVerified: u.emailVerified,
@@ -558,7 +558,7 @@ export const userRepository = {
       try {
         const staff = await prisma.user.findMany({
           where: {
-            role: 'staff',
+            role: { in: ['staff', 'customer_experience_manager'] },
             status: status ? (status as any) : { not: 'pending_email_verification' },
             ...(q
               ? {
@@ -580,7 +580,7 @@ export const userRepository = {
     }
 
     return memoryUsers
-      .filter((u) => u.role === 'staff' && u.status !== 'pending_email_verification')
+      .filter((u) => (u.role === 'staff' || u.role === 'customer_experience_manager') && u.status !== 'pending_email_verification')
       .filter((u) => !status || u.status === status)
       .filter(
         (u) =>
@@ -716,9 +716,160 @@ export const userRepository = {
       }
     }
 
-    const idx = memoryUsers.findIndex((u) => u.id === id && u.role === 'staff');
+    const idx = memoryUsers.findIndex((u) => u.id === id && (u.role === 'staff' || u.role === 'customer_experience_manager'));
     if (idx === -1) return false;
     memoryUsers.splice(idx, 1);
     return true;
+  },
+
+  async assignCemRole(
+    id: string,
+    assignedById: string,
+    scopeData?: { scopeType?: string; allowedPositions?: string[]; allowedStaffIds?: string[] },
+  ): Promise<StoredUser | null> {
+    if (env.DATABASE_URL) {
+      try {
+        const updated = await prisma.$transaction(async (tx: any) => {
+          const user = await tx.user.update({
+            where: { id },
+            data: { role: 'customer_experience_manager' },
+          });
+
+          await tx.managerScope.upsert({
+            where: { userId: id },
+            create: {
+              userId: id,
+              scopeType: scopeData?.scopeType || 'branch',
+              allowedPositions: scopeData?.allowedPositions || [],
+              allowedStaffIds: scopeData?.allowedStaffIds || [],
+              assignedById,
+            },
+            update: {
+              scopeType: scopeData?.scopeType || 'branch',
+              allowedPositions: scopeData?.allowedPositions || [],
+              allowedStaffIds: scopeData?.allowedStaffIds || [],
+              assignedById,
+            },
+          });
+
+          return user;
+        });
+
+        return mapPrismaUser(updated);
+      } catch (err) {
+        console.error('Error assigning CEM role in DB:', err);
+      }
+    }
+
+    const user = memoryUsers.find((u) => u.id === id);
+    if (!user) return null;
+    user.role = 'customer_experience_manager';
+    user.updatedAt = new Date().toISOString();
+    return user;
+  },
+
+  async revokeCemRole(id: string, _revokedById: string): Promise<StoredUser | null> {
+    if (env.DATABASE_URL) {
+      try {
+        const updated = await prisma.$transaction(async (tx: any) => {
+          const user = await tx.user.update({
+            where: { id },
+            data: { role: 'staff' },
+          });
+
+          await tx.managerScope.deleteMany({
+            where: { userId: id },
+          });
+
+          return user;
+        });
+
+        return mapPrismaUser(updated);
+      } catch (err) {
+        console.error('Error revoking CEM role in DB:', err);
+      }
+    }
+
+    const user = memoryUsers.find((u) => u.id === id);
+    if (!user) return null;
+    user.role = 'staff';
+    user.updatedAt = new Date().toISOString();
+    return user;
+  },
+
+  async updateCemScope(
+    id: string,
+    scopeData: { scopeType?: string; allowedPositions?: string[]; allowedStaffIds?: string[] },
+  ) {
+    if (env.DATABASE_URL) {
+      try {
+        return await prisma.managerScope.upsert({
+          where: { userId: id },
+          create: {
+            userId: id,
+            scopeType: scopeData.scopeType || 'branch',
+            allowedPositions: scopeData.allowedPositions || [],
+            allowedStaffIds: scopeData.allowedStaffIds || [],
+          },
+          update: {
+            scopeType: scopeData.scopeType || 'branch',
+            allowedPositions: scopeData.allowedPositions || [],
+            allowedStaffIds: scopeData.allowedStaffIds || [],
+          },
+        });
+      } catch (err) {
+        console.error('Error updating CEM scope in DB:', err);
+      }
+    }
+    return null;
+  },
+
+  async getCemScope(id: string) {
+    if (env.DATABASE_URL) {
+      try {
+        return await prisma.managerScope.findUnique({
+          where: { userId: id },
+          include: { assignedBy: { select: { fullName: true } } },
+        });
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  },
+
+  async listCemUsers(): Promise<Array<StoredUser & { scope?: any }>> {
+    if (env.DATABASE_URL) {
+      try {
+        const users = await prisma.user.findMany({
+          where: { role: 'customer_experience_manager', status: 'active' },
+          include: {
+            managerScope: {
+              include: { assignedBy: { select: { fullName: true } } },
+            },
+          },
+          orderBy: { fullName: 'asc' },
+        });
+
+        return users.map((u: any) => ({
+          ...mapPrismaUser(u),
+          scope: u.managerScope
+            ? {
+                scopeType: u.managerScope.scopeType,
+                allowedPositions: u.managerScope.allowedPositions,
+                allowedStaffIds: u.managerScope.allowedStaffIds,
+                assignedByName: u.managerScope.assignedBy?.fullName,
+                updatedAt: u.managerScope.updatedAt.toISOString(),
+              }
+            : null,
+        }));
+      } catch {
+        // Fall back to memory
+      }
+    }
+
+    return memoryUsers
+      .filter((u) => u.role === 'customer_experience_manager' && u.status === 'active')
+      .map((u) => ({ ...u, scope: null }));
   },
 };

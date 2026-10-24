@@ -70,10 +70,17 @@ export async function getMyDashboard(req: Request, res: Response, next: NextFunc
   }
 }
 
+import { isStaffInScope } from '../../utils/scope.js';
+
 export async function getStaffSummary(req: Request, res: Response, next: NextFunction) {
   try {
     const staffId = req.params.staffId as string;
-    if (req.user!.role !== 'manager' && req.user!.id !== staffId) {
+    const isAllowed =
+      req.user!.role === 'manager' ||
+      (req.user!.role === 'customer_experience_manager' && (await isStaffInScope(req.user!, staffId))) ||
+      req.user!.id === staffId;
+
+    if (!isAllowed) {
       throw ApiError.forbidden('You do not have permission to view performance summary for this staff member.');
     }
     const period = (req.query.period as PerformancePeriod) || 'daily';
@@ -88,7 +95,12 @@ export async function getStaffSummary(req: Request, res: Response, next: NextFun
 export async function getStaffTrend(req: Request, res: Response, next: NextFunction) {
   try {
     const staffId = req.params.staffId as string;
-    if (req.user!.role !== 'manager' && req.user!.id !== staffId) {
+    const isAllowed =
+      req.user!.role === 'manager' ||
+      (req.user!.role === 'customer_experience_manager' && (await isStaffInScope(req.user!, staffId))) ||
+      req.user!.id === staffId;
+
+    if (!isAllowed) {
       throw ApiError.forbidden('You do not have permission to view trend data for this staff member.');
     }
     const period = (req.query.period as PerformancePeriod) || 'daily';
@@ -103,7 +115,12 @@ export async function getStaffTrend(req: Request, res: Response, next: NextFunct
 export async function getStaffDashboard(req: Request, res: Response, next: NextFunction) {
   try {
     const staffId = req.params.staffId as string;
-    if (req.user!.role !== 'manager' && req.user!.id !== staffId) {
+    const isAllowed =
+      req.user!.role === 'manager' ||
+      (req.user!.role === 'customer_experience_manager' && (await isStaffInScope(req.user!, staffId))) ||
+      req.user!.id === staffId;
+
+    if (!isAllowed) {
       throw ApiError.forbidden('You do not have permission to view performance data for this staff member.');
     }
     const period = (req.query.period as PerformancePeriod) || 'daily';

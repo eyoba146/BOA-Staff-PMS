@@ -143,10 +143,82 @@ export function StaffFeedbackPage() {
                         {selectedItem.message}
                       </div>
 
+                      {/* Suggested Action & Follow-up Date if provided */}
+                      {(selectedItem.suggestedAction || selectedItem.followUpDate) && (
+                        <div className="rounded-lg border border-gold-200 bg-gold-50/50 p-3.5 text-xs space-y-1.5">
+                          <div className="font-semibold text-gold-950 flex items-center justify-between">
+                            <span>Coaching & Action Plan:</span>
+                            {selectedItem.followUpDate && (
+                              <span className="text-[11px] font-normal text-gold-800">
+                                Target Date: {formatDate(selectedItem.followUpDate)}
+                              </span>
+                            )}
+                          </div>
+                          {selectedItem.suggestedAction && (
+                            <p className="text-zinc-700 leading-relaxed">{selectedItem.suggestedAction}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Staff Acknowledgment & Response Section */}
+                      <div className="rounded-lg border border-zinc-200 bg-zinc-50/50 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-zinc-900">Coaching Status & Staff Response</span>
+                          {selectedItem.acknowledgedAt ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              <CheckCircle2 className="size-3" />
+                              Acknowledged {formatDate(selectedItem.acknowledgedAt, 'short')}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await feedbackService.acknowledge(selectedItem.id);
+                                void state.reload({ silent: true });
+                              }}
+                              className="inline-flex items-center gap-1 rounded bg-gold-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-gold-700 transition"
+                            >
+                              <CheckCircle2 className="size-3.5" />
+                              Acknowledge Coaching
+                            </button>
+                          )}
+                        </div>
+
+                        {selectedItem.staffReply ? (
+                          <div className="rounded border border-zinc-200 bg-white p-3 text-xs text-zinc-800 space-y-1">
+                            <div className="text-[11px] font-semibold text-zinc-500">Your Response:</div>
+                            <p className="leading-relaxed whitespace-pre-line">{selectedItem.staffReply}</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <textarea
+                              id={`reply-${selectedItem.id}`}
+                              placeholder="Write a response or follow-up note back to the manager..."
+                              rows={2}
+                              className="w-full rounded border border-zinc-300 p-2 text-xs focus:border-gold-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const el = document.getElementById(`reply-${selectedItem.id}`) as HTMLTextAreaElement | null;
+                                const text = el?.value?.trim();
+                                if (text) {
+                                  await feedbackService.reply(selectedItem.id, text);
+                                  void state.reload({ silent: true });
+                                }
+                              }}
+                              className="rounded border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 transition"
+                            >
+                              Send Response Note
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
                       <div className="flex items-center justify-between text-xs text-zinc-400 pt-3 border-t border-zinc-100">
                         <span className="flex items-center gap-1.5">
                           <User className="size-3.5 text-zinc-400" />
-                          Branch Manager: {selectedItem.managerName}
+                          Advisor: {selectedItem.managerName}
                         </span>
                         <span>Received {formatDateTime(selectedItem.createdAt)}</span>
                       </div>

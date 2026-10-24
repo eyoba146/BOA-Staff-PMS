@@ -17,6 +17,12 @@ export interface Feedback {
   audience?: CommunicationAudience;
   subject: string;
   message: string;
+  suggestedAction?: string | null;
+  followUpDate?: string | null;
+  status?: 'pending' | 'acknowledged' | 'in_progress' | 'completed';
+  acknowledgedAt?: ISODateTime | null;
+  staffReply?: string | null;
+  staffRepliedAt?: ISODateTime | null;
   period?: PerformancePeriod | null;
   periodLabel?: string | null;
   kpiId?: string | null;
@@ -36,6 +42,8 @@ export interface FeedbackInput {
   audience?: CommunicationAudience;
   subject: string;
   message: string;
+  suggestedAction?: string | null;
+  followUpDate?: string | null;
   period?: PerformancePeriod | null;
   periodLabel?: string | null;
   kpiId?: string | null;
@@ -73,7 +81,8 @@ export interface ChatParticipant {
   id: string;
   fullName: string;
   position: string;
-  role?: 'staff' | 'manager';
+  role?: 'staff' | 'manager' | 'customer_experience_manager';
+  participantRole?: 'owner' | 'moderator' | 'member';
 }
 
 export interface ChatMessage {
@@ -81,18 +90,25 @@ export interface ChatMessage {
   conversationId: string;
   senderId: string;
   senderName: string;
-  senderRole?: 'staff' | 'manager';
+  senderRole?: 'staff' | 'manager' | 'customer_experience_manager';
   senderPosition?: string;
   body: string;
   sentAt: ISODateTime;
   editedAt?: ISODateTime | null;
   isDeleted?: boolean;
+  isPinned?: boolean;
+  pinnedAt?: ISODateTime | null;
+  isModerated?: boolean;
+  moderatedAt?: ISODateTime | null;
+  moderationReason?: string | null;
 }
 
 export interface Conversation {
   id: string;
-  type: 'branch' | 'direct';
+  type: 'branch' | 'direct' | 'group';
   title: string;
+  description?: string | null;
+  createdById?: string | null;
   participants: ChatParticipant[];
   lastMessage: ChatMessage | null;
   unreadCount: number;

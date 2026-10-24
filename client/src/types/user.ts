@@ -1,6 +1,19 @@
 import type { ISODateTime } from './common';
 
-export type Role = 'staff' | 'manager';
+export type Role = 'staff' | 'manager' | 'customer_experience_manager';
+
+export type ScopeType = 'branch' | 'positions' | 'staff';
+
+export interface ManagerScope {
+  id: string;
+  userId: string;
+  scopeType: ScopeType;
+  allowedPositions: string[];
+  allowedStaffIds: string[];
+  assignedById: string;
+  createdAt: ISODateTime;
+  updatedAt: ISODateTime;
+}
 
 export type AccountStatus =
   | 'pending_email_verification'
@@ -33,6 +46,8 @@ export interface User {
   emailVerified?: boolean;
   /** Timestamp when email verification was completed. */
   emailVerifiedAt?: ISODateTime | null;
+  /** Customer Experience Manager scope if applicable */
+  scope?: ManagerScope | null;
 }
 
 export interface LoginRequest {

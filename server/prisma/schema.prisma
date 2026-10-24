@@ -11,6 +11,7 @@ generator client {
 enum Role {
   staff
   manager
+  customer_experience_manager
 }
 
 enum AccountStatus {
@@ -64,6 +65,7 @@ enum AnnouncementStatus {
 enum ConversationType {
   branch
   direct
+  group
 }
 
 enum VerificationPurpose {
@@ -104,6 +106,11 @@ model User {
   auditLogs                AuditLog[]
   notifications            Notification[]
   campaigns                Campaign[]
+  managerScope             ManagerScope?              @relation("UserScope")
+  assignedScopes           ManagerScope[]             @relation("AssignedScopes")
+  createdConversations     Conversation[]             @relation("CreatedConversations")
+  pinnedMessages           ChatMessage[]              @relation("PinnedMessages")
+  moderatedMessages        ChatMessage[]              @relation("ModeratedMessages")
 
   @@index([email])
   @@index([employeeId])
@@ -190,6 +197,12 @@ model Feedback {
   audience         String    @default("recipient_only")
   subject          String
   message          String
+  suggestedAction  String?
+  followUpDate     DateTime?
+  status           String    @default("pending")
+  acknowledgedAt   DateTime?
+  staffReply       String?
+  staffRepliedAt   DateTime?
   period           String?
   periodLabel      String?
   kpiId            String?
@@ -239,11 +252,14 @@ model AnnouncementRead {
 }
 
 model Conversation {
-  id        String           @id @default(uuid())
-  type      ConversationType @default(direct)
-  title     String
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id          String           @id @default(uuid())
+  type        ConversationType @default(direct)
+  title       String
+  description String?
+  createdById String?
+  createdBy   User?            @relation("CreatedConversations", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   participants ConversationParticipant[]
   messages     ChatMessage[]
@@ -255,6 +271,7 @@ model ConversationParticipant {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           String       @default("member")
   lastReadAt     DateTime?
 
   @@unique([conversationId, userId])
@@ -262,18 +279,42 @@ model ConversationParticipant {
 }
 
 model ChatMessage {
-  id             String       @id @default(uuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderId       String
-  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  body           String
-  isEdited       Boolean      @default(false)
-  sentAt         DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id               String       @id @default(uuid())
+  conversationId   String
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId         String
+  sender           User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body             String
+  isEdited         Boolean      @default(false)
+  isPinned         Boolean      @default(false)
+  pinnedAt         DateTime?
+  pinnedById       String?
+  pinnedBy         User?        @relation("PinnedMessages", fields: [pinnedById], references: [id], onDelete: SetNull)
+  isModerated      Boolean      @default(false)
+  moderatedAt      DateTime?
+  moderatedById    String?
+  moderatedBy      User?        @relation("ModeratedMessages", fields: [moderatedById], references: [id], onDelete: SetNull)
+  moderationReason String?
+  sentAt           DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([conversationId, sentAt])
   @@index([senderId])
+}
+
+model ManagerScope {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation("UserScope", fields: [userId], references: [id], onDelete: Cascade)
+  scopeType        String    @default("branch")
+  allowedPositions String[]  @default([])
+  allowedStaffIds  String[]  @default([])
+  assignedById     String?
+  assignedBy       User?     @relation("AssignedScopes", fields: [assignedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
 }
 
 model SystemSettings {

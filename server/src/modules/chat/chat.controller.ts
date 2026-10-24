@@ -80,6 +80,73 @@ export async function startDirect(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function createGroup(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.user!.id || req.user!.userId;
+    const { title, description, participantIds } = req.body;
+    const conv = await chatService.createGroupConversation(
+      userId,
+      req.user!.role,
+      title,
+      description,
+      participantIds,
+    );
+    res.status(201).json(conv);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function addParticipant(req: Request, res: Response, next: NextFunction) {
+  try {
+    const convId = req.params.id as string;
+    const userId = req.user!.id || req.user!.userId;
+    const { targetUserId } = req.body;
+    if (!targetUserId) throw ApiError.badRequest('targetUserId is required.');
+    await chatService.addGroupParticipant(convId, userId, req.user!.role, targetUserId);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function removeParticipant(req: Request, res: Response, next: NextFunction) {
+  try {
+    const convId = req.params.id as string;
+    const targetUserId = req.params.userId as string;
+    const userId = req.user!.id || req.user!.userId;
+    await chatService.removeGroupParticipant(convId, userId, req.user!.role, targetUserId);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function pinMessage(req: Request, res: Response, next: NextFunction) {
+  try {
+    const convId = req.params.convId as string;
+    const msgId = req.params.msgId as string;
+    const userId = req.user!.id || req.user!.userId;
+    const updated = await chatService.pinMessage(convId, msgId, userId, req.user!.role);
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function moderateMessage(req: Request, res: Response, next: NextFunction) {
+  try {
+    const convId = req.params.convId as string;
+    const msgId = req.params.msgId as string;
+    const userId = req.user!.id || req.user!.userId;
+    const { reason } = req.body;
+    const updated = await chatService.moderateMessage(convId, msgId, userId, req.user!.role, reason);
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getContacts(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.id || req.user!.userId;
@@ -89,3 +156,4 @@ export async function getContacts(req: Request, res: Response, next: NextFunctio
     next(err);
   }
 }
+

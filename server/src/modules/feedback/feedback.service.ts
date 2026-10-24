@@ -5,6 +5,7 @@ import { renderCommunicationEmail } from '../../utils/emailTemplates.js';
 import { ApiError } from '../../utils/apiError.js';
 import { recordAuditLog } from '../audit/audit.service.js';
 import { realtimeService } from '../realtime/realtime.service.js';
+import { isStaffInScope, getStaffIdsInScope } from '../../utils/scope.js';
 
 export type CommunicationType = 'feedback' | 'reminder' | 'warning' | 'appreciation';
 export type CommunicationAudience = 'recipient_only' | 'recipient_and_manager';
@@ -47,6 +48,12 @@ export async function listReceivedFeedback(staffId: string) {
       period: true,
       periodLabel: true,
       kpiId: true,
+      suggestedAction: true,
+      followUpDate: true,
+      status: true,
+      acknowledgedAt: true,
+      staffReply: true,
+      staffRepliedAt: true,
       emailStatus: true,
       emailDeliveredAt: true,
       emailError: true,
@@ -76,6 +83,12 @@ export async function listReceivedFeedback(staffId: string) {
     periodLabel: f.periodLabel,
     kpiId: f.kpiId,
     kpiName: f.kpi?.name ?? null,
+    suggestedAction: f.suggestedAction,
+    followUpDate: f.followUpDate ? f.followUpDate.toISOString() : null,
+    status: f.status || 'pending',
+    acknowledgedAt: f.acknowledgedAt ? f.acknowledgedAt.toISOString() : null,
+    staffReply: f.staffReply,
+    staffRepliedAt: f.staffRepliedAt ? f.staffRepliedAt.toISOString() : null,
     emailStatus: f.emailStatus || 'queued',
     emailDeliveredAt: f.emailDeliveredAt ? f.emailDeliveredAt.toISOString() : null,
     readAt: f.readAt ? f.readAt.toISOString() : null,
@@ -86,19 +99,34 @@ export async function listReceivedFeedback(staffId: string) {
   return result;
 }
 
-export async function listAllFeedback(filter?: { staffId?: string; type?: string }) {
-  const cacheKey = `all_${filter?.staffId ?? ''}_${filter?.type ?? ''}`;
+export async function listAllFeedback(
+  filter?: { staffId?: string; type?: string; status?: string },
+  callerUser?: { id: string; role: string },
+) {
+  const cacheKey = `all_${callerUser?.id ?? ''}_${filter?.staffId ?? ''}_${filter?.type ?? ''}_${filter?.status ?? ''}`;
   const cached = feedbackCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < FEEDBACK_CACHE_TTL) {
     return cached.data;
   }
 
   const where: any = {};
+
+  if (callerUser?.role === 'customer_experience_manager') {
+    const scopeIds = await getStaffIdsInScope(callerUser);
+    where.OR = [
+      { staffId: { in: scopeIds } },
+      { managerId: callerUser.id },
+    ];
+  }
+
   if (filter?.staffId && filter.staffId !== 'all') {
     where.staffId = filter.staffId;
   }
   if (filter?.type && filter.type !== 'all') {
     where.type = filter.type;
+  }
+  if (filter?.status && filter.status !== 'all') {
+    where.status = filter.status;
   }
 
   const list = await prisma.feedback.findMany({
@@ -114,6 +142,12 @@ export async function listAllFeedback(filter?: { staffId?: string; type?: string
       period: true,
       periodLabel: true,
       kpiId: true,
+      suggestedAction: true,
+      followUpDate: true,
+      status: true,
+      acknowledgedAt: true,
+      staffReply: true,
+      staffRepliedAt: true,
       emailStatus: true,
       emailDeliveredAt: true,
       emailError: true,
@@ -144,6 +178,12 @@ export async function listAllFeedback(filter?: { staffId?: string; type?: string
     periodLabel: f.periodLabel,
     kpiId: f.kpiId,
     kpiName: f.kpi?.name ?? null,
+    suggestedAction: f.suggestedAction,
+    followUpDate: f.followUpDate ? f.followUpDate.toISOString() : null,
+    status: f.status || 'pending',
+    acknowledgedAt: f.acknowledgedAt ? f.acknowledgedAt.toISOString() : null,
+    staffReply: f.staffReply,
+    staffRepliedAt: f.staffRepliedAt ? f.staffRepliedAt.toISOString() : null,
     emailStatus: f.emailStatus || 'queued',
     emailDeliveredAt: f.emailDeliveredAt ? f.emailDeliveredAt.toISOString() : null,
     emailError: f.emailError,
@@ -162,16 +202,23 @@ export interface CreateCommunicationInput {
   audience?: CommunicationAudience;
   subject: string;
   message: string;
+  suggestedAction?: string;
+  followUpDate?: string;
   period?: string;
   periodLabel?: string;
   kpiId?: string;
 }
 
-export async function createFeedback(managerId: string, input: CreateCommunicationInput) {
+export async function createFeedback(
+  managerId: string,
+  input: CreateCommunicationInput,
+  callerUser?: { id: string; role: string },
+) {
   const type = (input.type || 'feedback') as CommunicationType;
   const audience = (input.audience || 'recipient_only') as CommunicationAudience;
   const subject = input.subject?.trim();
   const message = input.message?.trim();
+  const isAll = input.staffId === 'all';
 
   if (!subject) throw ApiError.badRequest('Subject is required.');
   if (!message) throw ApiError.badRequest('Message is required.');
@@ -183,8 +230,22 @@ export async function createFeedback(managerId: string, input: CreateCommunicati
   });
   if (!manager) throw ApiError.unauthorized('Manager not authenticated.');
 
+  // Verify scope if caller is Customer Experience Manager
+  if (callerUser?.role === 'customer_experience_manager') {
+    if (isAll) {
+      const scope = await prisma.managerScope.findUnique({ where: { userId: managerId } });
+      if (scope && scope.scopeType !== 'branch') {
+        throw ApiError.forbidden('Your Customer Experience Manager scope does not permit broadcasting to all branch staff.');
+      }
+    } else {
+      const inScope = await isStaffInScope(callerUser, input.staffId);
+      if (!inScope) {
+        throw ApiError.forbidden('You do not have permission to give feedback to staff outside your permitted scope.');
+      }
+    }
+  }
+
   // Determine recipients
-  const isAll = input.staffId === 'all';
   let targetStaff: Array<{ id: string; fullName: string; email: string; employeeId: string | null; positionTitle: string }>;
 
   if (isAll) {
@@ -197,7 +258,7 @@ export async function createFeedback(managerId: string, input: CreateCommunicati
     }
   } else {
     const singleStaff = await prisma.user.findFirst({
-      where: { id: input.staffId, role: 'staff', status: 'active' },
+      where: { id: input.staffId, role: { in: ['staff', 'customer_experience_manager'] }, status: 'active' },
       select: { id: true, fullName: true, email: true, employeeId: true, positionTitle: true },
     });
     if (!singleStaff) {
@@ -221,6 +282,9 @@ export async function createFeedback(managerId: string, input: CreateCommunicati
         audience,
         subject,
         message,
+        suggestedAction: input.suggestedAction?.trim() || null,
+        followUpDate: input.followUpDate ? new Date(input.followUpDate) : null,
+        status: 'pending',
         period: input.period || null,
         periodLabel: input.periodLabel || null,
         kpiId: input.kpiId || null,
@@ -294,6 +358,12 @@ export async function createFeedback(managerId: string, input: CreateCommunicati
       audience: updated.audience,
       subject: updated.subject,
       message: updated.message,
+      suggestedAction: updated.suggestedAction,
+      followUpDate: updated.followUpDate ? updated.followUpDate.toISOString().slice(0, 10) : null,
+      status: updated.status,
+      acknowledgedAt: updated.acknowledgedAt?.toISOString() ?? null,
+      staffReply: updated.staffReply,
+      staffRepliedAt: updated.staffRepliedAt?.toISOString() ?? null,
       period: updated.period,
       periodLabel: updated.periodLabel,
       kpiId: updated.kpiId,
@@ -455,6 +525,12 @@ export async function markFeedbackRead(id: string, userId: string) {
     audience: updated.audience,
     subject: updated.subject,
     message: updated.message,
+    suggestedAction: updated.suggestedAction,
+    followUpDate: updated.followUpDate ? updated.followUpDate.toISOString() : null,
+    status: updated.status,
+    acknowledgedAt: updated.acknowledgedAt ? updated.acknowledgedAt.toISOString() : null,
+    staffReply: updated.staffReply,
+    staffRepliedAt: updated.staffRepliedAt ? updated.staffRepliedAt.toISOString() : null,
     period: updated.period,
     periodLabel: updated.periodLabel,
     kpiId: updated.kpiId,
@@ -463,4 +539,86 @@ export async function markFeedbackRead(id: string, userId: string) {
     readAt: updated.readAt?.toISOString() ?? null,
     createdAt: updated.createdAt.toISOString(),
   };
+}
+
+export async function acknowledgeFeedback(feedbackId: string, staffId: string) {
+  const fb = await prisma.feedback.findUnique({
+    where: { id: feedbackId },
+    include: {
+      manager: { select: { id: true, fullName: true } },
+      staff: { select: { fullName: true } },
+    },
+  });
+  if (!fb) throw ApiError.notFound('Feedback not found.');
+  if (fb.staffId !== staffId) throw ApiError.forbidden('You can only acknowledge feedback addressed to you.');
+
+  const updated = await prisma.feedback.update({
+    where: { id: feedbackId },
+    data: {
+      status: 'acknowledged',
+      acknowledgedAt: new Date(),
+      readAt: fb.readAt || new Date(),
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: fb.managerId,
+      title: 'Feedback Acknowledged',
+      message: `${fb.staff.fullName} acknowledged your coaching feedback: "${fb.subject}".`,
+      type: 'success',
+      link: '/manager/feedback',
+    },
+  }).catch(() => {});
+
+  await recordAuditLog({
+    action: 'FEEDBACK_ACKNOWLEDGED',
+    actorId: staffId,
+    details: { feedbackId, subject: fb.subject },
+  });
+
+  invalidateFeedbackCache(staffId);
+  return updated;
+}
+
+export async function replyFeedback(feedbackId: string, staffId: string, reply: string) {
+  if (!reply?.trim()) throw ApiError.badRequest('Reply text is required.');
+  const fb = await prisma.feedback.findUnique({
+    where: { id: feedbackId },
+    include: {
+      manager: { select: { id: true, fullName: true } },
+      staff: { select: { fullName: true } },
+    },
+  });
+  if (!fb) throw ApiError.notFound('Feedback not found.');
+  if (fb.staffId !== staffId) throw ApiError.forbidden('You can only reply to feedback addressed to you.');
+
+  const updated = await prisma.feedback.update({
+    where: { id: feedbackId },
+    data: {
+      staffReply: reply.trim(),
+      staffRepliedAt: new Date(),
+      status: 'in_progress',
+      readAt: fb.readAt || new Date(),
+    },
+  });
+
+  await prisma.notification.create({
+    data: {
+      userId: fb.managerId,
+      title: 'Staff Replied to Feedback',
+      message: `${fb.staff.fullName} replied to "${fb.subject}": ${reply.trim().slice(0, 100)}`,
+      type: 'info',
+      link: '/manager/feedback',
+    },
+  }).catch(() => {});
+
+  await recordAuditLog({
+    action: 'FEEDBACK_REPLIED',
+    actorId: staffId,
+    details: { feedbackId, subject: fb.subject, reply: reply.trim() },
+  });
+
+  invalidateFeedbackCache(staffId);
+  return updated;
 }

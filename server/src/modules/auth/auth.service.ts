@@ -23,7 +23,7 @@ export interface PublicUser {
   phone: string;
   position: string;
   branchName: string;
-  role: 'staff' | 'manager';
+  role: 'staff' | 'manager' | 'customer_experience_manager';
   status: StoredUser['status'];
   createdAt: string;
   approvedAt?: string | null;

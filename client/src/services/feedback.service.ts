@@ -13,6 +13,8 @@ export interface FeedbackService {
   create(input: FeedbackInput): Promise<any>;
   markRead(id: string): Promise<Feedback>;
   retryEmail(id: string): Promise<Feedback>;
+  acknowledge(id: string): Promise<Feedback>;
+  reply(id: string, reply: string): Promise<Feedback>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -22,6 +24,8 @@ const httpFeedbackService: FeedbackService = {
   create: (input) => api.post<any>('/feedback', input),
   markRead: (id) => api.patch<Feedback>(`/feedback/${id}/read`),
   retryEmail: (id) => api.post<Feedback>(`/feedback/${id}/retry-email`),
+  acknowledge: (id) => api.post<Feedback>(`/feedback/${id}/acknowledge`),
+  reply: (id, reply) => api.post<Feedback>(`/feedback/${id}/reply`, { reply }),
 };
 
 // ---------------- Mock adapter ----------------
@@ -113,6 +117,26 @@ const mockFeedbackService: FeedbackService = {
     const item = getDb().feedback.find((f) => f.id === id && f.staffId === user.id);
     if (!item) throw mockError(404, 'NOT_FOUND', 'Feedback not found.');
     item.readAt ??= nowISO();
+    commit();
+    return item;
+  },
+  async acknowledge(id) {
+    await delay(150);
+    const user = requireUser();
+    const item = getDb().feedback.find((f) => f.id === id && f.staffId === user.id);
+    if (!item) throw mockError(404, 'NOT_FOUND', 'Feedback not found.');
+    item.status = 'acknowledged';
+    item.acknowledgedAt = nowISO();
+    commit();
+    return item;
+  },
+  async reply(id, replyText) {
+    await delay(200);
+    const user = requireUser();
+    const item = getDb().feedback.find((f) => f.id === id && f.staffId === user.id);
+    if (!item) throw mockError(404, 'NOT_FOUND', 'Feedback not found.');
+    item.staffReply = replyText;
+    item.staffRepliedAt = nowISO();
     commit();
     return item;
   },

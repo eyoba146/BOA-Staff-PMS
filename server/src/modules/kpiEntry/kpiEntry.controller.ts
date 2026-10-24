@@ -18,6 +18,8 @@ export async function listMine(req: Request, res: Response, next: NextFunction) 
   }
 }
 
+import { isStaffInScope } from '../../utils/scope.js';
+
 export async function listForStaff(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user!.id || req.user!.userId;
@@ -25,8 +27,13 @@ export async function listForStaff(req: Request, res: Response, next: NextFuncti
     if (!staffId) {
       throw ApiError.badRequest('staffId parameter is required.');
     }
-    // Only managers or the staff member themselves can view
-    if (req.user!.role !== 'manager' && userId !== staffId) {
+    // Managers have branch-wide access; CEMs have scoped access; staff can view only their own records
+    if (req.user!.role === 'customer_experience_manager') {
+      const inScope = await isStaffInScope(req.user!, staffId);
+      if (!inScope) {
+        throw ApiError.forbidden('You do not have permission to view performance records for this staff member.');
+      }
+    } else if (req.user!.role !== 'manager' && userId !== staffId) {
       throw ApiError.forbidden('You do not have permission to view performance records for another staff member.');
     }
     const entries = await kpiEntryService.listEntries({

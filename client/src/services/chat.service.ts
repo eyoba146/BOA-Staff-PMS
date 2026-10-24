@@ -14,7 +14,7 @@ export interface ChatContact {
   id: string;
   employeeId?: string;
   fullName: string;
-  role: 'manager' | 'staff';
+  role: 'manager' | 'staff' | 'customer_experience_manager';
   position: string;
   avatarUrl?: string | null;
 }
@@ -28,6 +28,11 @@ export interface ChatService {
   /** Find or create a direct conversation with another user. */
   startDirect(userId: string): Promise<Conversation>;
   getContacts(): Promise<ChatContact[]>;
+  createGroup(title: string, participantIds: string[], description?: string): Promise<Conversation>;
+  addParticipant(conversationId: string, userId: string): Promise<void>;
+  removeParticipant(conversationId: string, userId: string): Promise<void>;
+  pinMessage(conversationId: string, messageId: string): Promise<ChatMessage>;
+  moderateMessage(conversationId: string, messageId: string, reason: string): Promise<ChatMessage>;
 }
 
 // ---------------- HTTP adapter ----------------
@@ -39,6 +44,16 @@ const httpChatService: ChatService = {
   deleteMessage: (convId, msgId) => api.delete<void>(`/conversations/${convId}/messages/${msgId}`),
   startDirect: (userId) => api.post<Conversation>('/conversations', { type: 'direct', participantId: userId }),
   getContacts: () => api.get<ChatContact[]>('/conversations/contacts'),
+  createGroup: (title, participantIds, description) =>
+    api.post<Conversation>('/conversations/group', { title, participantIds, description }),
+  addParticipant: (conversationId, userId) =>
+    api.post<void>(`/conversations/${conversationId}/participants`, { userId }),
+  removeParticipant: (conversationId, userId) =>
+    api.delete<void>(`/conversations/${conversationId}/participants/${userId}`),
+  pinMessage: (conversationId, messageId) =>
+    api.post<ChatMessage>(`/conversations/${conversationId}/messages/${messageId}/pin`),
+  moderateMessage: (conversationId, messageId, reason) =>
+    api.post<ChatMessage>(`/conversations/${conversationId}/messages/${messageId}/moderate`, { reason }),
 };
 
 // ---------------- Mock adapter ----------------
@@ -157,11 +172,35 @@ const mockChatService: ChatService = {
         id: u.id,
         employeeId: u.employeeId,
         fullName: u.fullName,
-        role: u.role,
+        role: u.role as any,
         position: u.role === 'manager' ? 'Branch Manager' : (u.position || 'Staff'),
         avatarUrl: u.avatarUrl,
       }))
       .sort((a, _b) => (a.role === 'manager' ? -1 : 1));
+  },
+  async createGroup(title, participantIds) {
+    await delay(200);
+    const user = requireUser();
+    const c = { id: uid('g'), type: 'group' as const, title, participantIds: [user.id, ...participantIds], lastReadAt: { [user.id]: nowISO() } };
+    return toDto(c as any, getDb(), user.id);
+  },
+  async addParticipant() {
+    await delay(100);
+  },
+  async removeParticipant() {
+    await delay(100);
+  },
+  async pinMessage(convId, msgId) {
+    await delay(100);
+    const msg = getDb().messages.find((m) => m.id === msgId && m.conversationId === convId);
+    if (!msg) throw mockError(404, 'NOT_FOUND', 'Message not found');
+    return msg as any;
+  },
+  async moderateMessage(convId, msgId) {
+    await delay(100);
+    const msg = getDb().messages.find((m) => m.id === msgId && m.conversationId === convId);
+    if (!msg) throw mockError(404, 'NOT_FOUND', 'Message not found');
+    return msg as any;
   },
 };
 

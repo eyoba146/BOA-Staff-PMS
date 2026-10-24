@@ -76,9 +76,27 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
     },
     { label: 'System', items: [{ label: 'Settings', to: paths.manager.settings, icon: Settings }] },
   ],
+  customer_experience_manager: [
+    { label: 'Overview', items: [{ label: 'Dashboard', to: paths.cem.dashboard, icon: LayoutDashboard }] },
+    {
+      label: 'Performance & Coaching',
+      items: [
+        { label: 'Staff in Scope', to: paths.cem.staff, icon: Users },
+        { label: 'Coaching & Feedback', to: paths.cem.feedback, icon: MessageSquareText },
+      ],
+    },
+    {
+      label: 'Communication',
+      items: [
+        { label: 'Chat & Moderation', to: paths.cem.chat, icon: MessagesSquare, countKey: 'unreadChat' },
+      ],
+    },
+    { label: 'Account', items: [{ label: 'Profile', to: paths.cem.profile, icon: UserRound }] },
+  ],
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
   staff: 'Staff portal',
   manager: 'Manager portal',
+  customer_experience_manager: 'Customer Experience Portal',
 };

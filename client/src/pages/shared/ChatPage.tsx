@@ -11,6 +11,8 @@ import {
   Pencil,
   Trash2,
   ShieldCheck,
+  Pin,
+  ShieldAlert,
 } from 'lucide-react';
 import { useCurrentUser } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -19,7 +21,7 @@ import { realtimeService } from '@/services/realtime.service';
 import { useAsync } from '@/hooks/useAsync';
 import { PageHeader, ConfirmDialog } from '@/components/shared';
 import { NewConversationDialog } from '@/components/chat/NewConversationDialog';
-import { Avatar, Button, Input, SkeletonRows, EmptyState } from '@/components/ui';
+import { Avatar, Button, Input, SkeletonRows, EmptyState, Dialog, Field } from '@/components/ui';
 import type { ChatMessage } from '@/types';
 import { formatDateTime } from '@/utils/date';
 import { cn } from '@/utils/cn';
@@ -42,6 +44,11 @@ export function ChatPage() {
   // Deleting state
   const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Moderation state
+  const [moderateTarget, setModerateTarget] = useState<ChatMessage | null>(null);
+  const [moderateReason, setModerateReason] = useState('');
+  const [moderating, setModerating] = useState(false);
 
   // Mobile pane toggling: true = show thread on mobile
   const [showThreadOnMobile, setShowThreadOnMobile] = useState(false);
@@ -340,6 +347,49 @@ export function ChatPage() {
     }
   };
 
+  const handleCreateGroup = async (title: string, participantIds: string[], description?: string) => {
+    try {
+      const group = await chatService.createGroup(title, participantIds, description);
+      await convsState.reload();
+      setActiveConvId(group.id);
+      setShowThreadOnMobile(true);
+      showToast({ tone: 'gold', title: 'Group Created', message: `Group "${title}" created successfully.` });
+    } catch (err: any) {
+      showToast({ tone: 'danger', title: 'Error', message: err?.message || 'Failed to create group.' });
+    }
+  };
+
+  const handlePinMessage = async (msg: ChatMessage) => {
+    if (!activeConvId) return;
+    try {
+      const updated = await chatService.pinMessage(activeConvId, msg.id);
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, isPinned: updated.isPinned } : m)));
+      showToast({
+        tone: 'gold',
+        title: updated.isPinned ? 'Message Pinned' : 'Message Unpinned',
+        message: updated.isPinned ? 'Message pinned to group conversation.' : 'Message unpinned.',
+      });
+    } catch (err: any) {
+      showToast({ tone: 'danger', title: 'Pin Error', message: err?.message || 'Could not pin message.' });
+    }
+  };
+
+  const handleModerateMessage = async () => {
+    if (!activeConvId || !moderateTarget) return;
+    setModerating(true);
+    try {
+      const updated = await chatService.moderateMessage(activeConvId, moderateTarget.id, moderateReason);
+      setMessages((prev) => prev.map((m) => (m.id === moderateTarget.id ? { ...m, ...updated } : m)));
+      showToast({ tone: 'gold', title: 'Message Moderated', message: 'Message was removed for branch policy compliance.' });
+      setModerateTarget(null);
+      setModerateReason('');
+    } catch (err: any) {
+      showToast({ tone: 'danger', title: 'Moderation Error', message: err?.message || 'Failed to moderate message.' });
+    } finally {
+      setModerating(false);
+    }
+  };
+
   const filteredConversations = (convsState.data ?? []).filter((c) =>
     c.title.toLowerCase().includes(search.toLowerCase()),
   );
@@ -548,10 +598,12 @@ export function ChatPage() {
                     const isPending = msg.id.startsWith('temp_');
                     const canEdit = isMe && !isPending;
                     const canDelete = (isMe || currentUser.role === 'manager') && !isPending;
+                    const isModerator = (currentUser.role === 'manager' || currentUser.role === 'customer_experience_manager') && activeConversation?.type !== 'direct';
                     const prevMsg = messages[i - 1];
                     const isSameSender = prevMsg && prevMsg.senderId === msg.senderId;
                     const isEditingThis = editingMsgId === msg.id;
                     const isManager = msg.senderRole === 'manager';
+                    const isCem = msg.senderRole === 'customer_experience_manager';
 
                     return (
                       <div
@@ -566,6 +618,10 @@ export function ChatPage() {
                             {isManager ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 to-gold-500/35 px-2 py-0.5 text-[9.5px] font-bold text-amber-950 border border-amber-400/60 shadow-xs">
                                 <ShieldCheck className="size-2.5 text-amber-800" /> Branch Manager
+                              </span>
+                            ) : isCem ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[9.5px] font-bold text-amber-900 border border-amber-300 shadow-xs">
+                                <ShieldCheck className="size-2.5 text-amber-700" /> Customer Experience Manager
                               </span>
                             ) : (
                               <span className="inline-flex items-center rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9.5px] font-medium text-zinc-600 border border-zinc-200">
@@ -656,14 +712,40 @@ export function ChatPage() {
                               isMe ? 'flex-row' : 'flex-row-reverse',
                             )}
                           >
-                            {/* Quick Action buttons (Edit & Delete on hover/focus) */}
-                            {(canEdit || canDelete) && (
+                            {/* Quick Action buttons (Edit, Delete, Pin, Moderate) */}
+                            {(canEdit || canDelete || isModerator) && (
                               <div
                                 className={cn(
                                   'flex items-center gap-0.5 rounded-md border border-zinc-200/90 bg-white px-1 py-0.5 shadow-xs transition-opacity',
                                   'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100',
                                 )}
                               >
+                                {isModerator && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handlePinMessage(msg)}
+                                    className={cn(
+                                      'rounded p-1 text-zinc-400 transition-colors hover:bg-gold-50 hover:text-gold-700',
+                                      msg.isPinned && 'text-gold-600 font-bold',
+                                    )}
+                                    title={msg.isPinned ? 'Unpin message' : 'Pin message'}
+                                  >
+                                    <Pin className="size-3.5" />
+                                  </button>
+                                )}
+                                {isModerator && !isMe && !msg.isModerated && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setModerateTarget(msg);
+                                      setModerateReason('');
+                                    }}
+                                    className="rounded p-1 text-zinc-400 transition-colors hover:bg-amber-50 hover:text-amber-700"
+                                    title="Moderate inappropriate message"
+                                  >
+                                    <ShieldAlert className="size-3.5" />
+                                  </button>
+                                )}
                                 {canEdit && (
                                   <button
                                     type="button"
@@ -705,7 +787,20 @@ export function ChatPage() {
                                 isPending && 'opacity-70',
                               )}
                             >
-                              <p className="whitespace-pre-line">{msg.body}</p>
+                              {msg.isPinned && (
+                                <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold text-gold-700 border-b border-gold-200/50 pb-0.5">
+                                  <Pin className="size-2.5 fill-gold-600" />
+                                  <span>Pinned</span>
+                                </div>
+                              )}
+                              {msg.isModerated ? (
+                                <div className="rounded border border-amber-200 bg-amber-50/70 p-2 text-xs italic text-amber-900 flex items-center gap-1.5">
+                                  <ShieldAlert className="size-3.5 text-amber-700 shrink-0" />
+                                  <span>{msg.body}</span>
+                                </div>
+                              ) : (
+                                <p className="whitespace-pre-line">{msg.body}</p>
+                              )}
                               <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px]">
                                 {msg.editedAt && (
                                   <span
@@ -768,7 +863,9 @@ export function ChatPage() {
         onClose={() => setNewDialogOpened(false)}
         contacts={contacts}
         currentUserId={currentUser.id}
+        canCreateGroup={currentUser.role === 'manager' || currentUser.role === 'customer_experience_manager'}
         onSelectUser={handleStartConversationWithUser}
+        onCreateGroup={handleCreateGroup}
       />
 
       {/* Delete Message Confirmation Dialog */}
@@ -782,6 +879,45 @@ export function ChatPage() {
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {/* Moderate Message Dialog */}
+      <Dialog
+        open={Boolean(moderateTarget)}
+        onClose={() => setModerateTarget(null)}
+        title="Moderate Message"
+        description={`Remove message sent by ${moderateTarget?.senderName} and replace it with an official moderation notice for branch policy compliance.`}
+        size="sm"
+        busy={moderating}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setModerateTarget(null)} disabled={moderating}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleModerateMessage}
+              loading={moderating}
+            >
+              Confirm Moderation
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 py-2">
+          {moderateTarget && (
+            <div className="rounded bg-zinc-100 p-2 text-xs text-zinc-700 italic border border-zinc-200">
+              &quot;{moderateTarget.body}&quot;
+            </div>
+          )}
+          <Field label="Moderation Reason (Recorded in Audit Log)" required>
+            <Input
+              placeholder="e.g. Inappropriate language, off-topic, unprofessional communication"
+              value={moderateReason}
+              onChange={(e) => setModerateReason(e.target.value)}
+            />
+          </Field>
+        </div>
+      </Dialog>
     </div>
   );
 }

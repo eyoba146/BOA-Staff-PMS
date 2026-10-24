@@ -3,6 +3,8 @@ import { env } from '../../config/env.js';
 import { ApiError } from '../../utils/apiError.js';
 import { realtimeService } from '../realtime/realtime.service.js';
 import { userRepository } from '../../repositories/user.repository.js';
+import { recordAuditLog } from '../audit/audit.service.js';
+import { isStaffInScope } from '../../utils/scope.js';
 
 const enrolledBranchUsers = new Set<string>();
 let cachedBranchConvId: string | null = null;
@@ -146,12 +148,17 @@ export async function listConversations(userId: string) {
         .map((p: any) => ({
           id: p.user.id,
           fullName: p.user.fullName,
-          position: p.user.positionTitle || (p.user.role === 'manager' ? 'Branch Manager' : 'Staff'),
+          position: p.user.role === 'manager'
+            ? 'Branch Manager'
+            : p.user.role === 'customer_experience_manager'
+            ? 'Customer Experience Manager'
+            : (p.user.positionTitle || 'Staff'),
           role: p.user.role,
+          participantRole: p.role || 'member',
         }));
 
       const other = participants.find((p: any) => p.id !== userId);
-      const title = c.type === 'branch' ? c.title : other?.fullName ?? 'Conversation';
+      const title = c.type === 'direct' ? (other?.fullName ?? 'Conversation') : c.title;
 
       const formattedLastMsg = lastMsg
         ? {
@@ -160,10 +167,16 @@ export async function listConversations(userId: string) {
             senderId: lastMsg.senderId,
             senderName: lastMsg.sender.fullName,
             senderRole: lastMsg.sender.role,
-            senderPosition: lastMsg.sender.role === 'manager' ? 'Branch Manager' : (lastMsg.sender.positionTitle || 'Staff'),
+            senderPosition: lastMsg.sender.role === 'manager'
+              ? 'Branch Manager'
+              : lastMsg.sender.role === 'customer_experience_manager'
+              ? 'Customer Experience Manager'
+              : (lastMsg.sender.positionTitle || 'Staff'),
             body: lastMsg.body,
             sentAt: lastMsg.sentAt.toISOString(),
             isEdited: lastMsg.isEdited,
+            isPinned: lastMsg.isPinned,
+            isModerated: lastMsg.isModerated,
           }
         : null;
 
@@ -171,6 +184,8 @@ export async function listConversations(userId: string) {
         id: c.id,
         type: c.type,
         title,
+        description: c.description,
+        createdById: c.createdById,
         participants,
         lastMessage: formattedLastMsg,
         unreadCount,
@@ -244,10 +259,19 @@ export async function getMessages(conversationId: string, userId: string) {
     senderId: m.senderId,
     senderName: m.sender.fullName,
     senderRole: m.sender.role,
-    senderPosition: m.sender.role === 'manager' ? 'Branch Manager' : (m.sender.positionTitle || 'Staff'),
+    senderPosition: m.sender.role === 'manager'
+      ? 'Branch Manager'
+      : m.sender.role === 'customer_experience_manager'
+      ? 'Customer Experience Manager'
+      : (m.sender.positionTitle || 'Staff'),
     body: m.body,
     sentAt: m.sentAt.toISOString(),
     isEdited: m.isEdited,
+    isPinned: m.isPinned,
+    pinnedAt: m.pinnedAt?.toISOString() ?? null,
+    isModerated: m.isModerated,
+    moderatedAt: m.moderatedAt?.toISOString() ?? null,
+    moderationReason: m.moderationReason,
   }));
 }
 
@@ -293,10 +317,16 @@ export async function sendMessage(conversationId: string, senderId: string, body
     senderId: msg.senderId,
     senderName: msg.sender.fullName,
     senderRole: msg.sender.role,
-    senderPosition: msg.sender.role === 'manager' ? 'Branch Manager' : (msg.sender.positionTitle || 'Staff'),
+    senderPosition: msg.sender.role === 'manager'
+      ? 'Branch Manager'
+      : msg.sender.role === 'customer_experience_manager'
+      ? 'Customer Experience Manager'
+      : (msg.sender.positionTitle || 'Staff'),
     body: msg.body,
     sentAt: msg.sentAt.toISOString(),
     isEdited: msg.isEdited,
+    isPinned: msg.isPinned,
+    isModerated: msg.isModerated,
   };
 
   // Reuse pre-fetched participants list to avoid extra database round-trip
@@ -379,16 +409,38 @@ export async function editMessage(conversationId: string, messageId: string, use
 }
 
 export async function deleteMessage(conversationId: string, messageId: string, userId: string, role: string) {
-  const msg = await prisma.chatMessage.findUnique({ where: { id: messageId } });
+  const msg = await prisma.chatMessage.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { participants: true } } },
+  });
   if (!msg) {
     throw ApiError.notFound('Message not found.');
   }
 
-  if (msg.senderId !== userId && role !== 'manager') {
+  const isMe = msg.senderId === userId;
+  const isManager = role === 'manager';
+
+  let isCemModerator = false;
+  if (role === 'customer_experience_manager' && msg.conversation.type !== 'direct') {
+    const myParticipant = msg.conversation.participants.find((p: any) => p.userId === userId);
+    if (myParticipant && (myParticipant.role === 'moderator' || msg.conversation.type === 'branch' || msg.conversation.createdById === userId)) {
+      isCemModerator = true;
+    }
+  }
+
+  if (!isMe && !isManager && !isCemModerator) {
     throw ApiError.forbidden('You do not have permission to delete this message.');
   }
 
   await prisma.chatMessage.delete({ where: { id: messageId } });
+
+  if (!isMe) {
+    await recordAuditLog({
+      action: 'CHAT_MESSAGE_DELETED_BY_MODERATOR',
+      actorId: userId,
+      details: { conversationId, messageId, originalSenderId: msg.senderId },
+    });
+  }
 
   const participants = await prisma.conversationParticipant.findMany({
     where: { conversationId },
@@ -402,6 +454,289 @@ export async function deleteMessage(conversationId: string, messageId: string, u
   );
   realtimeService.notifyCountInvalidated(participantIds);
   participantIds.forEach((id: string) => invalidateConversationCache(id));
+}
+
+export async function createGroupConversation(
+  creatorId: string,
+  callerRole: string,
+  title: string,
+  description?: string,
+  participantIds: string[] = [],
+) {
+  if (!title?.trim()) {
+    throw ApiError.badRequest('Group title is required.');
+  }
+
+  // If CEM, validate scope: all initial participants must be within CEM's permitted scope
+  if (callerRole === 'customer_experience_manager') {
+    for (const pid of participantIds) {
+      if (pid === creatorId) continue;
+      const inScope = await isStaffInScope({ id: creatorId, role: callerRole }, pid);
+      if (!inScope) {
+        throw ApiError.forbidden('Cannot add staff members outside your permitted scope to this group.');
+      }
+    }
+  }
+
+  const allParticipantIds = Array.from(new Set([creatorId, ...participantIds]));
+
+  const created = await prisma.conversation.create({
+    data: {
+      type: 'group',
+      title: title.trim(),
+      description: description?.trim() || null,
+      createdById: creatorId,
+      participants: {
+        create: allParticipantIds.map((uid) => ({
+          userId: uid,
+          role: uid === creatorId ? (callerRole === 'manager' ? 'admin' : 'moderator') : 'member',
+        })),
+      },
+    },
+    include: {
+      participants: {
+        include: {
+          user: { select: { id: true, fullName: true, positionTitle: true, role: true } },
+        },
+      },
+    },
+  });
+
+  allParticipantIds.forEach((id) => invalidateConversationCache(id));
+
+  await recordAuditLog({
+    action: 'CHAT_GROUP_CREATED',
+    actorId: creatorId,
+    details: { conversationId: created.id, title, participantCount: allParticipantIds.length },
+  });
+
+  return {
+    id: created.id,
+    type: created.type,
+    title: created.title,
+    description: created.description,
+    createdById: created.createdById,
+    participants: created.participants.map((p: any) => ({
+      id: p.user.id,
+      fullName: p.user.fullName,
+      position: p.user.role === 'manager' ? 'Branch Manager' : (p.user.positionTitle || 'Staff'),
+      role: p.user.role,
+      participantRole: p.role,
+    })),
+    lastMessage: null,
+    unreadCount: 0,
+    updatedAt: created.updatedAt.toISOString(),
+  };
+}
+
+export async function addGroupParticipant(
+  conversationId: string,
+  actorId: string,
+  actorRole: string,
+  targetUserId: string,
+) {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { participants: true },
+  });
+  if (!conv) throw ApiError.notFound('Conversation not found.');
+  if (conv.type !== 'group') throw ApiError.badRequest('Can only manage members in group conversations.');
+
+  const isActorAdmin = actorRole === 'manager';
+  const myParticipant = conv.participants.find((p: any) => p.userId === actorId);
+  const isActorModerator = myParticipant?.role === 'moderator' || conv.createdById === actorId;
+
+  if (!isActorAdmin && !isActorModerator) {
+    throw ApiError.forbidden('You do not have permission to manage members in this group.');
+  }
+
+  if (actorRole === 'customer_experience_manager') {
+    const inScope = await isStaffInScope({ id: actorId, role: actorRole }, targetUserId);
+    if (!inScope) {
+      throw ApiError.forbidden('Cannot add staff member outside your permitted scope.');
+    }
+  }
+
+  const existing = conv.participants.find((p: any) => p.userId === targetUserId);
+  if (existing) {
+    throw ApiError.conflict('User is already a member of this conversation.');
+  }
+
+  await prisma.conversationParticipant.create({
+    data: {
+      conversationId,
+      userId: targetUserId,
+      role: 'member',
+    },
+  });
+
+  invalidateConversationCache(targetUserId);
+  invalidateConversationCache(actorId);
+
+  await recordAuditLog({
+    action: 'CHAT_GROUP_MEMBER_ADDED',
+    actorId,
+    details: { conversationId, addedUserId: targetUserId },
+  });
+}
+
+export async function removeGroupParticipant(
+  conversationId: string,
+  actorId: string,
+  actorRole: string,
+  targetUserId: string,
+) {
+  const conv = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { participants: { include: { user: true } } },
+  });
+  if (!conv) throw ApiError.notFound('Conversation not found.');
+  if (conv.type !== 'group') throw ApiError.badRequest('Can only manage members in group conversations.');
+
+  const targetParticipant = conv.participants.find((p: any) => p.userId === targetUserId);
+  if (!targetParticipant) throw ApiError.notFound('Target user is not a member of this group.');
+
+  // Crucial check: CEM cannot remove or demote administrators!
+  if (targetParticipant.user.role === 'manager' && actorRole !== 'manager') {
+    throw ApiError.forbidden('Customer Experience Managers cannot remove or demote administrators.');
+  }
+
+  const isActorAdmin = actorRole === 'manager';
+  const myParticipant = conv.participants.find((p: any) => p.userId === actorId);
+  const isActorModerator = myParticipant?.role === 'moderator' || conv.createdById === actorId;
+
+  if (!isActorAdmin && !isActorModerator && actorId !== targetUserId) {
+    throw ApiError.forbidden('You do not have permission to remove members from this group.');
+  }
+
+  await prisma.conversationParticipant.delete({
+    where: {
+      conversationId_userId: {
+        conversationId,
+        userId: targetUserId,
+      },
+    },
+  });
+
+  invalidateConversationCache(targetUserId);
+  invalidateConversationCache(actorId);
+
+  await recordAuditLog({
+    action: 'CHAT_GROUP_MEMBER_REMOVED',
+    actorId,
+    details: { conversationId, removedUserId: targetUserId },
+  });
+}
+
+export async function pinMessage(
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  role: string,
+) {
+  const msg = await prisma.chatMessage.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { participants: true } } },
+  });
+  if (!msg) throw ApiError.notFound('Message not found.');
+  if (msg.conversationId !== conversationId) throw ApiError.badRequest('Message does not belong to this conversation.');
+
+  const isManager = role === 'manager';
+  const myParticipant = msg.conversation.participants.find((p: any) => p.userId === userId);
+  const isCemAuthorized = role === 'customer_experience_manager' && (myParticipant?.role === 'moderator' || msg.conversation.type === 'branch' || msg.conversation.createdById === userId);
+
+  if (!isManager && !isCemAuthorized) {
+    throw ApiError.forbidden('You do not have permission to pin messages in this conversation.');
+  }
+
+  const nextPinned = !msg.isPinned;
+  const updated = await prisma.chatMessage.update({
+    where: { id: messageId },
+    data: {
+      isPinned: nextPinned,
+      pinnedAt: nextPinned ? new Date() : null,
+      pinnedById: nextPinned ? userId : null,
+    },
+  });
+
+  const participantIds = msg.conversation.participants.map((p: any) => p.userId);
+  realtimeService.broadcastToConversation(participantIds, 'chat_message_pinned', {
+    conversationId,
+    messageId,
+    isPinned: nextPinned,
+    pinnedAt: updated.pinnedAt?.toISOString() ?? null,
+  });
+
+  await recordAuditLog({
+    action: nextPinned ? 'CHAT_MESSAGE_PINNED' : 'CHAT_MESSAGE_UNPINNED',
+    actorId: userId,
+    details: { conversationId, messageId },
+  });
+
+  return updated;
+}
+
+export async function moderateMessage(
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  role: string,
+  reason: string,
+) {
+  const msg = await prisma.chatMessage.findUnique({
+    where: { id: messageId },
+    include: { conversation: { include: { participants: true } } },
+  });
+  if (!msg) throw ApiError.notFound('Message not found.');
+
+  const isManager = role === 'manager';
+  const myParticipant = msg.conversation.participants.find((p: any) => p.userId === userId);
+  const isCemAuthorized = role === 'customer_experience_manager' && (myParticipant?.role === 'moderator' || msg.conversation.type === 'branch' || msg.conversation.createdById === userId);
+
+  if (!isManager && !isCemAuthorized) {
+    throw ApiError.forbidden('You do not have permission to moderate messages in this conversation.');
+  }
+
+  const updated = await prisma.chatMessage.update({
+    where: { id: messageId },
+    data: {
+      isModerated: true,
+      moderatedAt: new Date(),
+      moderatedById: userId,
+      moderationReason: reason?.trim() || 'Content flagged by moderator.',
+      body: '[This message was removed by a moderator for violating branch communication standards]',
+    },
+    include: {
+      sender: { select: { fullName: true, role: true, positionTitle: true } },
+    },
+  });
+
+  const formattedMsg = {
+    id: updated.id,
+    conversationId: updated.conversationId,
+    senderId: updated.senderId,
+    senderName: updated.sender.fullName,
+    senderRole: updated.sender.role,
+    senderPosition: updated.sender.role === 'manager' ? 'Branch Manager' : (updated.sender.positionTitle || 'Staff'),
+    body: updated.body,
+    sentAt: updated.sentAt.toISOString(),
+    isEdited: updated.isEdited,
+    isPinned: updated.isPinned,
+    isModerated: true,
+    moderatedAt: updated.moderatedAt?.toISOString(),
+    moderationReason: updated.moderationReason,
+  };
+
+  const participantIds = msg.conversation.participants.map((p: any) => p.userId);
+  realtimeService.broadcastToConversation(participantIds, 'chat_message_updated', formattedMsg);
+
+  await recordAuditLog({
+    action: 'CHAT_MESSAGE_MODERATED',
+    actorId: userId,
+    details: { conversationId, messageId, originalSenderId: msg.senderId, reason },
+  });
+
+  return formattedMsg;
 }
 
 export async function startDirectConversation(userId: string, participantId: string) {
@@ -577,3 +912,5 @@ export async function getContacts(currentUserId: string) {
   }
   return contacts;
 }
+
+export const createGroup = createGroupConversation;
