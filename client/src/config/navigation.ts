@@ -79,6 +79,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
       items: [
         { label: 'CX Dashboard', to: paths.cem.dashboard, icon: LayoutDashboard },
         { label: 'CX Staff in Scope', to: paths.cem.staff, icon: Users },
+        { label: 'CX Coaching & Feedback', to: paths.cem.feedback, icon: MessageSquareText },
       ],
     },
     { label: 'System', items: [{ label: 'Settings', to: paths.manager.settings, icon: Settings }] },

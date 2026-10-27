@@ -139,7 +139,7 @@ export function CampaignDialog({
       onClose={onClose}
       title={isEditing ? 'Edit Campaign' : 'Create Branch Campaign'}
       description="Define campaign operational targets, measurable actuals, timelines, and monitoring metrics."
-      size="md"
+      size="lg"
       busy={submitting}
       footer={
         <>

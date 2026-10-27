@@ -778,7 +778,7 @@ export function StaffListPage() {
         }}
         title="Official Staff Clearance & Credential Provisioning"
         description="Verify candidate eligibility and authorize Employee ID issuance."
-        size="md"
+        size="lg"
         busy={approving}
         footer={
           <>
@@ -973,7 +973,7 @@ export function StaffListPage() {
         onClose={() => setAssignCemUser(null)}
         title={assignCemUser?.role === 'customer_experience_manager' ? 'Configure Manager Scope' : 'Assign Customer Experience Manager'}
         description={`Set supervision scope for ${assignCemUser?.fullName} (${assignCemUser?.position || 'Staff'}). The manager will only be permitted to monitor KPIs, give coaching, and moderate group chats within this scope.`}
-        size="md"
+        size="lg"
         busy={savingCem}
         footer={
           <>

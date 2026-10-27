@@ -378,7 +378,7 @@ export function KpiFormDialog({ open, onClose, onSubmit, kpi }: KpiFormDialogPro
       onClose={onClose}
       title={isEdit ? `Edit KPI — ${kpi?.name}` : 'Create New KPI'}
       description="Define multi-period performance targets across Daily, Weekly, Monthly, Quarterly, and Yearly schedules."
-      size="lg"
+      size="xl"
       busy={submitting}
       footer={
         <>

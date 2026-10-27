@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Target,
   Megaphone,
+  Sparkles,
 } from 'lucide-react';
 import { performanceService } from '@/services/performance.service';
 import { useAsync } from '@/hooks/useAsync';
@@ -147,6 +148,45 @@ export function ManagerDashboardPage() {
                   </Link>
                 </div>
               )}
+
+              {/* Customer Experience Management & Coaching Banner */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl border border-gold-200 bg-gradient-to-r from-gold-500/10 via-amber-50/40 to-white p-4 sm:p-5 shadow-sm">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-gold-400 shadow-md">
+                    <Sparkles className="size-6 stroke-[2.2]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm sm:text-base font-bold text-ink-950">
+                        Customer Experience Management & Coaching
+                      </h4>
+                      <span className="rounded-full bg-gold-500/20 px-2 py-0.5 text-[11px] font-bold text-gold-950">
+                        Fully Integrated
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-zinc-600">
+                      Access Customer Experience Manager scorecards, supervise scoped staff coaching, and review performance delivery.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <Link to={paths.cem.dashboard}>
+                    <Button variant="primary" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
+                      Open CX Portal
+                    </Button>
+                  </Link>
+                  <Link to={paths.cem.feedback}>
+                    <Button variant="secondary" size="sm">
+                      Coaching & Feedback
+                    </Button>
+                  </Link>
+                  <Link to={paths.cem.staff}>
+                    <Button variant="ghost" size="sm">
+                      Staff in Scope
+                    </Button>
+                  </Link>
+                </div>
+              </div>
 
               {/* Main Content Grid: Trend + Attention & Breakdown */}
               <div className="grid gap-6 lg:grid-cols-3">

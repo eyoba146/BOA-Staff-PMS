@@ -66,7 +66,7 @@ export function AssignKpiDialog({
       onClose={onClose}
       title={`Assign KPI — ${kpi.name}`}
       description="Select staff members who will record daily/periodic performance for this indicator."
-      size="md"
+      size="lg"
       busy={saving}
       footer={
         <>

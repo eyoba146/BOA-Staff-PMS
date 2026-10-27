@@ -81,7 +81,7 @@ export function AnnouncementFormDialog({
       onClose={onClose}
       title={isEdit ? 'Edit Announcement' : 'New Branch Announcement'}
       description="Post meetings, holiday schedules, branch notices, or team announcements."
-      size="md"
+      size="lg"
       busy={submitting}
       footer={
         <>

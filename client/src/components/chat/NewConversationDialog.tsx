@@ -62,7 +62,7 @@ export function NewConversationDialog({
           ? 'Select a branch colleague or manager to start a private messaging thread.'
           : 'Create a collaborative work group for staff within your supervision scope.'
       }
-      size="md"
+      size="lg"
       busy={submittingGroup}
       footer={
         <div className="flex items-center justify-end gap-2 w-full">

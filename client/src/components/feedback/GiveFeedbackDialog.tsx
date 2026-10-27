@@ -113,7 +113,7 @@ export function GiveFeedbackDialog({
       onClose={onClose}
       title="Branch Communication & Performance Record"
       description="Record official feedback, reminders, warnings, or commendations with in-app & transactional email delivery."
-      size="md"
+      size="lg"
       busy={submitting}
       footer={
         <>

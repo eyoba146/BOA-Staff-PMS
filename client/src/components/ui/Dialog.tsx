@@ -9,7 +9,7 @@ interface DialogProps {
   description?: ReactNode;
   children?: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   /**
    * `any`: Esc + backdrop click close (informational dialogs).
    * `closerequest`: Esc only — protects form input from accidental backdrop clicks.
@@ -19,7 +19,14 @@ interface DialogProps {
   busy?: boolean;
 }
 
-const SIZES = { sm: 'sm:max-w-md', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl' };
+const SIZES = {
+  sm: 'sm:max-w-xl',
+  md: 'sm:max-w-3xl',
+  lg: 'sm:max-w-5xl',
+  xl: 'sm:max-w-6xl',
+  '2xl': 'sm:max-w-7xl',
+  full: 'sm:max-w-[95vw]',
+};
 
 /**
  * Modal built on native <dialog> + showModal(): top layer, focus trap and Esc handling come from
@@ -60,21 +67,21 @@ export function Dialog({ open, onClose, title, description, children, footer, si
       }}
       onClick={onBackdropClick}
       className={cn(
-        'w-full max-w-none overflow-hidden border border-zinc-200 bg-white p-0 shadow-xl',
-        'max-sm:mt-auto max-sm:mb-0 max-sm:max-h-[92dvh] max-sm:rounded-t-xl',
-        'sm:m-auto sm:max-h-[88dvh] sm:rounded-lg',
+        'w-[calc(100%-2rem)] max-w-none overflow-hidden border border-zinc-200 bg-white p-0 shadow-2xl backdrop:bg-zinc-950/45 backdrop:backdrop-blur-sm',
+        'max-sm:mt-auto max-sm:mb-0 max-sm:w-full max-sm:max-h-[92dvh] max-sm:rounded-t-2xl',
+        'sm:m-auto sm:max-h-[88dvh] sm:rounded-xl',
         SIZES[size],
       )}
     >
       {open && (
         <div className="flex max-h-[inherit] flex-col">
-          <header className="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4">
+          <header className="flex items-start justify-between gap-4 border-b border-zinc-100 px-6 py-4 sm:px-7 sm:py-5">
             <div>
-              <h2 id={titleId} className="text-base font-semibold text-zinc-900">
+              <h2 id={titleId} className="text-base sm:text-lg font-semibold text-zinc-900">
                 {title}
               </h2>
               {description && (
-                <p id={descId} className="mt-1 text-[13px] text-zinc-500">
+                <p id={descId} className="mt-1 text-[13px] text-zinc-500 leading-relaxed">
                   {description}
                 </p>
               )}
@@ -89,9 +96,9 @@ export function Dialog({ open, onClose, title, description, children, footer, si
               <X className="size-4" />
             </button>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 scrollbar-thin">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 sm:px-7 sm:py-6 scrollbar-thin">{children}</div>
           {footer && (
-            <footer className="flex flex-col-reverse gap-2 border-t border-zinc-100 bg-zinc-50/60 px-5 py-3 sm:flex-row sm:justify-end">
+            <footer className="flex flex-col-reverse gap-2 border-t border-zinc-100 bg-zinc-50/60 px-6 py-3.5 sm:px-7 sm:py-4 sm:flex-row sm:justify-end">
               {footer}
             </footer>
           )}
