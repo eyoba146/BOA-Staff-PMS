@@ -5,7 +5,7 @@ export type ISODate = string;
 /** Full ISO-8601 timestamp. */
 export type ISODateTime = string;
 
-export type PerformancePeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly';
+export type PerformancePeriod = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 /**
  * Whether a rule/threshold/policy has been approved by branch management.

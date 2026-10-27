@@ -74,6 +74,13 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         { label: 'Chat', to: paths.manager.chat, icon: MessagesSquare, countKey: 'unreadChat' },
       ],
     },
+    {
+      label: 'Customer Experience',
+      items: [
+        { label: 'CX Dashboard', to: paths.cem.dashboard, icon: LayoutDashboard },
+        { label: 'CX Staff in Scope', to: paths.cem.staff, icon: Users },
+      ],
+    },
     { label: 'System', items: [{ label: 'Settings', to: paths.manager.settings, icon: Settings }] },
   ],
   customer_experience_manager: [

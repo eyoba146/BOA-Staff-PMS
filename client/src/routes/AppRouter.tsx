@@ -71,8 +71,8 @@ export function AppRouter() {
             <Route path={paths.staff.profile} element={<ProfilePage />} />
           </Route>
 
-          {/* Customer Experience Manager Portal */}
-          <Route element={<RequireRole role="customer_experience_manager" />}>
+          {/* Customer Experience Manager Portal (Accessible to CEM and Administrator) */}
+          <Route element={<RequireRole roles={['customer_experience_manager', 'manager']} />}>
             <Route path={paths.cem.dashboard} element={<CemDashboardPage />} />
             <Route path={paths.cem.staff} element={<CemStaffListPage />} />
             <Route path="/cem/staff/:staffId" element={<StaffDetailPage />} />

@@ -211,7 +211,7 @@ export async function summarizeStaffPeriod(staffId: string, period: PerformanceP
   };
 }
 
-const TREND_POINTS: Record<PerformancePeriod, number> = { daily: 14, weekly: 10, monthly: 6, quarterly: 4 };
+const TREND_POINTS: Record<PerformancePeriod, number> = { daily: 14, weekly: 10, monthly: 6, quarterly: 4, yearly: 3 };
 
 export function computeTrendFromData(
   staffIds: string[],

@@ -75,12 +75,18 @@ export async function listKpis(params: { search?: string; status?: 'all' | 'acti
 
   const result = kpis.map((k: any) => ({
     id: k.id,
+    code: k.code,
     name: k.name,
     description: k.description,
     unit: k.unit,
     valueType: k.valueType,
     target: k.target,
     frequency: k.frequency,
+    dailyTarget: k.dailyTarget,
+    weeklyTarget: k.weeklyTarget,
+    monthlyTarget: k.monthlyTarget,
+    quarterlyTarget: k.quarterlyTarget,
+    yearlyTarget: k.yearlyTarget,
     weight: k.weight,
     calculationRule: k.calculationRule,
     ruleStatus: k.ruleStatus,
@@ -114,12 +120,18 @@ export async function getKpiById(id: string) {
 
   return {
     id: k.id,
+    code: k.code,
     name: k.name,
     description: k.description,
     unit: k.unit,
     valueType: k.valueType,
     target: k.target,
     frequency: k.frequency,
+    dailyTarget: k.dailyTarget,
+    weeklyTarget: k.weeklyTarget,
+    monthlyTarget: k.monthlyTarget,
+    quarterlyTarget: k.quarterlyTarget,
+    yearlyTarget: k.yearlyTarget,
     weight: k.weight,
     calculationRule: k.calculationRule,
     ruleStatus: k.ruleStatus,
@@ -141,15 +153,33 @@ export async function createKpi(data: any, managerId: string) {
     throw ApiError.conflict('A KPI with this name already exists.');
   }
 
+  const dailyTarget = data.dailyTarget !== undefined && data.dailyTarget !== null && data.dailyTarget !== '' ? Number(data.dailyTarget) : null;
+  const weeklyTarget = data.weeklyTarget !== undefined && data.weeklyTarget !== null && data.weeklyTarget !== '' ? Number(data.weeklyTarget) : null;
+  const monthlyTarget = data.monthlyTarget !== undefined && data.monthlyTarget !== null && data.monthlyTarget !== '' ? Number(data.monthlyTarget) : null;
+  const quarterlyTarget = data.quarterlyTarget !== undefined && data.quarterlyTarget !== null && data.quarterlyTarget !== '' ? Number(data.quarterlyTarget) : null;
+  const yearlyTarget = data.yearlyTarget !== undefined && data.yearlyTarget !== null && data.yearlyTarget !== '' ? Number(data.yearlyTarget) : null;
+
+  const target = data.target !== undefined && data.target !== null && data.target !== ''
+    ? Number(data.target)
+    : (dailyTarget ?? monthlyTarget ?? quarterlyTarget ?? weeklyTarget ?? yearlyTarget ?? 0);
+
+  const frequency = data.frequency || (dailyTarget ? 'daily' : monthlyTarget ? 'monthly' : quarterlyTarget ? 'quarterly' : 'daily');
+
   const kpi = await prisma.kpi.create({
     data: {
+      code: data.code?.trim() || null,
       name: data.name.trim(),
-      description: data.description.trim(),
+      description: data.description?.trim() || '',
       unit: data.unit.trim(),
       valueType: data.valueType,
-      target: Number(data.target),
-      frequency: data.frequency,
-      weight: data.weight !== undefined && data.weight !== null ? Number(data.weight) : null,
+      target,
+      frequency,
+      dailyTarget,
+      weeklyTarget,
+      monthlyTarget,
+      quarterlyTarget,
+      yearlyTarget,
+      weight: data.weight !== undefined && data.weight !== null && data.weight !== '' ? Number(data.weight) : null,
       calculationRule: data.calculationRule || null,
       ruleStatus: data.ruleStatus || 'pending_validation',
       isActive: data.isActive !== undefined ? data.isActive : true,
@@ -189,13 +219,19 @@ export async function updateKpi(id: string, data: any, managerId: string) {
   const updated = await prisma.kpi.update({
     where: { id },
     data: {
+      ...(data.code !== undefined ? { code: data.code?.trim() || null } : {}),
       ...(data.name ? { name: data.name.trim() } : {}),
       ...(data.description !== undefined ? { description: data.description.trim() } : {}),
       ...(data.unit !== undefined ? { unit: data.unit.trim() } : {}),
       ...(data.valueType ? { valueType: data.valueType } : {}),
       ...(data.target !== undefined ? { target: Number(data.target) } : {}),
       ...(data.frequency ? { frequency: data.frequency } : {}),
-      ...(data.weight !== undefined ? { weight: data.weight !== null ? Number(data.weight) : null } : {}),
+      ...(data.dailyTarget !== undefined ? { dailyTarget: data.dailyTarget !== null && data.dailyTarget !== '' ? Number(data.dailyTarget) : null } : {}),
+      ...(data.weeklyTarget !== undefined ? { weeklyTarget: data.weeklyTarget !== null && data.weeklyTarget !== '' ? Number(data.weeklyTarget) : null } : {}),
+      ...(data.monthlyTarget !== undefined ? { monthlyTarget: data.monthlyTarget !== null && data.monthlyTarget !== '' ? Number(data.monthlyTarget) : null } : {}),
+      ...(data.quarterlyTarget !== undefined ? { quarterlyTarget: data.quarterlyTarget !== null && data.quarterlyTarget !== '' ? Number(data.quarterlyTarget) : null } : {}),
+      ...(data.yearlyTarget !== undefined ? { yearlyTarget: data.yearlyTarget !== null && data.yearlyTarget !== '' ? Number(data.yearlyTarget) : null } : {}),
+      ...(data.weight !== undefined ? { weight: data.weight !== null && data.weight !== '' ? Number(data.weight) : null } : {}),
       ...(data.calculationRule !== undefined ? { calculationRule: data.calculationRule } : {}),
       ...(data.ruleStatus ? { ruleStatus: data.ruleStatus } : {}),
       ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
@@ -339,7 +375,7 @@ export async function getMyAssignedKpis(userId: string, date: string) {
 
   const result = assignments.map((asgn: any) => {
     const kpi = asgn.kpi;
-    const target = asgn.targetOverride ?? kpi.target;
+    const target = asgn.dailyTargetOverride ?? asgn.targetOverride ?? kpi.dailyTarget ?? kpi.target;
     const bounds = getPeriodBounds(kpi.frequency as any, date);
 
     const entry = entries.find(
@@ -348,12 +384,18 @@ export async function getMyAssignedKpis(userId: string, date: string) {
 
     const hydratedKpi = {
       id: kpi.id,
+      code: kpi.code,
       name: kpi.name,
       description: kpi.description,
       unit: kpi.unit,
       valueType: kpi.valueType,
       target: kpi.target,
       frequency: kpi.frequency,
+      dailyTarget: kpi.dailyTarget,
+      weeklyTarget: kpi.weeklyTarget,
+      monthlyTarget: kpi.monthlyTarget,
+      quarterlyTarget: kpi.quarterlyTarget,
+      yearlyTarget: kpi.yearlyTarget,
       weight: kpi.weight,
       calculationRule: kpi.calculationRule,
       ruleStatus: kpi.ruleStatus,

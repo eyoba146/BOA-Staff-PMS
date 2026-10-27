@@ -32,6 +32,7 @@ enum KpiFrequency {
   weekly
   monthly
   quarterly
+  yearly
 }
 
 enum KpiValueType {
@@ -132,12 +133,18 @@ model Position {
 
 model Kpi {
   id              String       @id @default(uuid())
+  code            String?
   name            String
   description     String
   unit            String
   valueType       KpiValueType
   target          Float
-  frequency       KpiFrequency
+  frequency       KpiFrequency @default(daily)
+  dailyTarget     Float?
+  weeklyTarget    Float?
+  monthlyTarget   Float?
+  quarterlyTarget Float?
+  yearlyTarget    Float?
   weight          Float?
   calculationRule String?
   ruleStatus      RuleStatus   @default(pending_validation)
@@ -153,13 +160,18 @@ model Kpi {
 }
 
 model KpiAssignment {
-  id             String   @id @default(uuid())
-  kpiId          String
-  kpi            Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
-  staffId        String
-  staff          User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  targetOverride Float?
-  assignedAt     DateTime @default(now())
+  id                      String   @id @default(uuid())
+  kpiId                   String
+  kpi                     Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  staffId                 String
+  staff                   User     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  targetOverride          Float?
+  dailyTargetOverride     Float?
+  weeklyTargetOverride    Float?
+  monthlyTargetOverride   Float?
+  quarterlyTargetOverride Float?
+  yearlyTargetOverride    Float?
+  assignedAt              DateTime @default(now())
 
   @@unique([kpiId, staffId])
   @@index([staffId])

@@ -151,7 +151,7 @@ export function summarizePeriod(db: MockDb, staffId: string, period: Performance
   return { ...summarizeRange(db, staffId, b.start, b.end), period, periodLabel: b.label };
 }
 
-const TREND_POINTS: Record<PerformancePeriod, number> = { daily: 14, weekly: 10, monthly: 6, quarterly: 4 };
+const TREND_POINTS: Record<PerformancePeriod, number> = { daily: 14, weekly: 10, monthly: 6, quarterly: 4, yearly: 3 };
 
 export function trendFor(
   db: MockDb,

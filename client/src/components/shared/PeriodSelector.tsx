@@ -4,7 +4,7 @@ import { cn } from '@/utils/cn';
 import { getPeriodBounds, PERIOD_LABELS, shiftPeriod, todayISO } from '@/utils/date';
 import { IconButton, SegmentedControl } from '../ui';
 
-const PERIODS: PerformancePeriod[] = ['daily', 'weekly', 'monthly', 'quarterly'];
+const PERIODS: PerformancePeriod[] = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
 interface PeriodSelectorProps {
   period: PerformancePeriod;

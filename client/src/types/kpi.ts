@@ -1,6 +1,6 @@
 import type { ISODate, ISODateTime, RuleStatus } from './common';
 
-export type KpiFrequency = 'daily' | 'weekly' | 'monthly' | 'quarterly';
+export type KpiFrequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 /** Drives input validation and formatting only — not calculation. */
 export type KpiValueType = 'integer' | 'decimal' | 'currency' | 'percentage';
@@ -11,6 +11,7 @@ export type KpiValueType = 'integer' | 'decimal' | 'currency' | 'percentage';
  */
 export interface Kpi {
   id: string;
+  code?: string | null;
   name: string;
   description: string;
   /** Free-text measurement unit label, e.g. "count", "ETB", "%". */
@@ -18,6 +19,11 @@ export interface Kpi {
   valueType: KpiValueType;
   target: number;
   frequency: KpiFrequency;
+  dailyTarget?: number | null;
+  weeklyTarget?: number | null;
+  monthlyTarget?: number | null;
+  quarterlyTarget?: number | null;
+  yearlyTarget?: number | null;
   /** Optional weight in percent, only meaningful when weighting is enabled. */
   weight: number | null;
   /** Human-readable description of the approved calculation rule. */
@@ -30,12 +36,18 @@ export interface Kpi {
 }
 
 export interface KpiInput {
+  code?: string | null;
   name: string;
   description: string;
   unit: string;
   valueType: KpiValueType;
   target: number;
   frequency: KpiFrequency;
+  dailyTarget?: number | null;
+  weeklyTarget?: number | null;
+  monthlyTarget?: number | null;
+  quarterlyTarget?: number | null;
+  yearlyTarget?: number | null;
   weight: number | null;
   calculationRule: string | null;
   ruleStatus: RuleStatus;
@@ -48,6 +60,11 @@ export interface KpiAssignment {
   staffId: string;
   /** Staff-specific target, if management sets individual targets. */
   targetOverride: number | null;
+  dailyTargetOverride?: number | null;
+  weeklyTargetOverride?: number | null;
+  monthlyTargetOverride?: number | null;
+  quarterlyTargetOverride?: number | null;
+  yearlyTargetOverride?: number | null;
   assignedAt: ISODateTime;
 }
 

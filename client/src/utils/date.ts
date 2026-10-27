@@ -66,6 +66,11 @@ export function getPeriodBounds(period: PerformancePeriod, ref: ISODate): Period
       const end = new Date(d.getFullYear(), q * 3 + 3, 0);
       return { start: toISODate(start), end: toISODate(end), label: `Q${q + 1} ${d.getFullYear()}` };
     }
+    case 'yearly': {
+      const start = new Date(d.getFullYear(), 0, 1);
+      const end = new Date(d.getFullYear(), 11, 31);
+      return { start: toISODate(start), end: toISODate(end), label: `${d.getFullYear()}` };
+    }
   }
 }
 
@@ -81,6 +86,8 @@ export function shiftPeriod(period: PerformancePeriod, ref: ISODate, offset: num
       return toISODate(new Date(d.getFullYear(), d.getMonth() + offset, 1));
     case 'quarterly':
       return toISODate(new Date(d.getFullYear(), d.getMonth() + offset * 3, 1));
+    case 'yearly':
+      return toISODate(new Date(d.getFullYear() + offset, 0, 1));
   }
 }
 
@@ -128,4 +135,5 @@ export const PERIOD_LABELS: Record<PerformancePeriod, string> = {
   weekly: 'Weekly',
   monthly: 'Monthly',
   quarterly: 'Quarterly',
+  yearly: 'Yearly',
 };

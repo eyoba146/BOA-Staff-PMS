@@ -27,6 +27,7 @@ export const FREQUENCY_LABELS: Record<KpiFrequency, string> = {
   weekly: 'Weekly',
   monthly: 'Monthly',
   quarterly: 'Quarterly',
+  yearly: 'Yearly',
 };
 
 export const ANNOUNCEMENT_CATEGORY_META: Record<AnnouncementCategory, { label: string; tone: Tone }> = {
