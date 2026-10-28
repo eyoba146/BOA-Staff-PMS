@@ -1,4 +1,5 @@
 import {
+  ClipboardList,
   ClipboardPenLine,
   FileBarChart,
   History,
@@ -49,6 +50,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         { label: 'Feedback', to: paths.staff.feedback, icon: MessageSquareText, countKey: 'unreadFeedback' },
         { label: 'Announcements', to: paths.staff.announcements, icon: Megaphone, countKey: 'unreadAnnouncements' },
         { label: 'Chat', to: paths.staff.chat, icon: MessagesSquare, countKey: 'unreadChat' },
+        { label: 'Daily Instructions', to: paths.staff.instructions, icon: ClipboardList },
       ],
     },
     { label: 'Account', items: [{ label: 'Profile', to: paths.staff.profile, icon: UserRound }] },
@@ -70,6 +72,7 @@ export const NAVIGATION: Record<Role, NavGroup[]> = {
         { label: 'Feedback', to: paths.manager.feedback, icon: MessageSquareText },
         { label: 'Announcements', to: paths.manager.announcements, icon: Megaphone },
         { label: 'Chat', to: paths.manager.chat, icon: MessagesSquare, countKey: 'unreadChat' },
+        { label: 'Daily Instructions', to: paths.manager.instructions, icon: ClipboardList },
       ],
     },
     { label: 'System', items: [{ label: 'Settings', to: paths.manager.settings, icon: Settings }] },

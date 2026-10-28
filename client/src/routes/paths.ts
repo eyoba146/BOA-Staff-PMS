@@ -15,6 +15,7 @@ export const paths = {
     performance: '/staff/performance',
     feedback: '/staff/feedback',
     announcements: '/staff/announcements',
+    instructions: '/staff/instructions',
     chat: '/staff/chat',
     profile: '/staff/profile',
   },
@@ -27,7 +28,8 @@ export const paths = {
     reports: '/manager/reports',
     feedback: '/manager/feedback',
     announcements: '/manager/announcements',
-    chat: '/manager/chat',
+    instructions: '/manager/instructions', 
+    chat: '/manager/chat',   
     settings: '/manager/settings',
   },
 } as const;
