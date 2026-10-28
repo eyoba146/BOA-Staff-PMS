@@ -19,6 +19,7 @@ import {
   FileBadge,
   Trash2,
   RotateCcw,
+  Plus,
 } from 'lucide-react';
 import { staffService } from '@/services/staff.service';
 import { useAsync } from '@/hooks/useAsync';
@@ -59,6 +60,8 @@ export function StaffListPage() {
   const [copiedRegister, setCopiedRegister] = useState(false);
 
   // Customer Experience Manager controls
+  const [assignCemModalOpen, setAssignCemModalOpen] = useState(false);
+  const [selectedCemStaffId, setSelectedCemStaffId] = useState<string>('');
   const [assignCemUser, setAssignCemUser] = useState<User | null>(null);
   const [cemScopeType, setCemScopeType] = useState<'branch' | 'positions' | 'staff'>('branch');
   const [cemAllowedPositions, setCemAllowedPositions] = useState<string[]>([]);
@@ -66,6 +69,10 @@ export function StaffListPage() {
   const [savingCem, setSavingCem] = useState(false);
   const [revokeCemUser, setRevokeCemUser] = useState<User | null>(null);
   const [revokingCem, setRevokingCem] = useState(false);
+
+  // Multi-select & bulk deletion state
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   // Sync tab with URL search parameter
   useEffect(() => {
@@ -97,7 +104,6 @@ export function StaffListPage() {
 
   // Delete staff state
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
     const [allStaff, pendingStaff] = await Promise.all([
@@ -175,24 +181,66 @@ export function StaffListPage() {
     }
   };
 
-  const handleDeleteUser = async () => {
+  const handleDeleteUser = () => {
     if (!deleteUser) return;
-    setDeleting(true);
-    try {
-      await staffService.delete(deleteUser.id);
-      showToast({
-        tone: 'success',
-        title: 'Staff member deleted',
-        message: `${deleteUser.fullName}'s account has been permanently removed.`,
-      });
-      setDeleteUser(null);
-      await state.reload();
-    } catch (err) {
+    const targetUser = deleteUser;
+    const targetId = targetUser.id;
+
+    // Instant optimistic removal from UI (0ms)
+    setDeleteUser(null);
+    setSelectedStaffIds((prev) => prev.filter((id) => id !== targetId));
+    state.setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            allStaff: prev.allStaff.filter((s) => s.id !== targetId),
+          }
+        : prev,
+    );
+
+    showToast({
+      tone: 'success',
+      title: 'Staff member deleted',
+      message: `${targetUser.fullName}'s account has been permanently removed.`,
+    });
+
+    // Fire background persistence with rollback on failure
+    void staffService.delete(targetId).catch((err) => {
       const apiErr = toApiError(err);
       showToast({ tone: 'danger', title: 'Delete failed', message: apiErr.message });
-    } finally {
-      setDeleting(false);
-    }
+      void state.reload({ silent: true });
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedStaffIds.length === 0) return;
+    const idsToDelete = [...selectedStaffIds];
+    const count = idsToDelete.length;
+
+    // Instant optimistic removal from UI (0ms)
+    setBulkDeleteOpen(false);
+    setSelectedStaffIds([]);
+    state.setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            allStaff: prev.allStaff.filter((s) => !idsToDelete.includes(s.id)),
+          }
+        : prev,
+    );
+
+    showToast({
+      tone: 'success',
+      title: 'Staff accounts deleted',
+      message: `Permanently removed ${count} staff account${count > 1 ? 's' : ''}.`,
+    });
+
+    // Fire background bulk persistence with rollback on failure
+    void staffService.deleteMany(idsToDelete).catch((err) => {
+      const apiErr = toApiError(err);
+      showToast({ tone: 'danger', title: 'Bulk delete failed', message: apiErr.message });
+      void state.reload({ silent: true });
+    });
   };
 
   const copyToClipboard = (text: string) => {
@@ -391,109 +439,196 @@ export function StaffListPage() {
                       </div>
                     </div>
                   ) : (
-                    <Card>
-                      <Table caption="Branch Staff Directory">
-                        <THead>
-                          <TR>
-                            <TH>Employee</TH>
-                            <TH>Position</TH>
-                            <TH hideBelow="md">Branch</TH>
-                            <TH align="center">Status</TH>
-                            <TH hideBelow="sm">Joined Date</TH>
-                            <TH align="right">Action</TH>
-                          </TR>
-                        </THead>
-                        <TBody>
-                          {filteredStaff.map((staff) => (
-                            <TR key={staff.id} interactive>
-                              <TD>
-                                <Link
-                                  to={paths.manager.staffDetail(staff.id)}
-                                  className="flex items-center gap-2.5 hover:underline"
+                    <div className="space-y-3">
+                      {selectedStaffIds.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-3 shadow-xs animate-in fade-in duration-150">
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex size-6 items-center justify-center rounded-full bg-gold-500 text-xs font-black text-ink-950">
+                              {selectedStaffIds.length}
+                            </span>
+                            <span className="text-xs font-bold text-ink-950">
+                              {selectedStaffIds.length} staff member{selectedStaffIds.length > 1 ? 's' : ''} selected
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedStaffIds([])}
+                              className="text-xs text-zinc-600 hover:text-zinc-900"
+                            >
+                              Clear Selection
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              leftIcon={<Trash2 className="size-3.5" />}
+                              onClick={() => setBulkDeleteOpen(true)}
+                              className="font-bold text-xs shadow-xs"
+                            >
+                              Delete Selected ({selectedStaffIds.length})
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <Card>
+                        <Table caption="Branch Staff Directory">
+                          <THead>
+                            <TR>
+                              <TH align="center" className="w-10">
+                                <input
+                                  type="checkbox"
+                                  aria-label="Select all displayed staff"
+                                  checked={
+                                    filteredStaff.length > 0 &&
+                                    filteredStaff.every((s) => selectedStaffIds.includes(s.id))
+                                  }
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      const combined = Array.from(
+                                        new Set([...selectedStaffIds, ...filteredStaff.map((s) => s.id)]),
+                                      );
+                                      setSelectedStaffIds(combined);
+                                    } else {
+                                      const currentIds = new Set(filteredStaff.map((s) => s.id));
+                                      setSelectedStaffIds(
+                                        selectedStaffIds.filter((id) => !currentIds.has(id)),
+                                      );
+                                    }
+                                  }}
+                                  className="size-4 rounded border-zinc-300 text-gold-600 focus:ring-gold-500 cursor-pointer"
+                                />
+                              </TH>
+                              <TH>Employee</TH>
+                              <TH>Position</TH>
+                              <TH hideBelow="md">Branch</TH>
+                              <TH align="center">Status</TH>
+                              <TH hideBelow="sm">Joined Date</TH>
+                              <TH align="right">Action</TH>
+                            </TR>
+                          </THead>
+                          <TBody>
+                            {filteredStaff.map((staff) => {
+                              const isSelected = selectedStaffIds.includes(staff.id);
+                              return (
+                                <TR
+                                  key={staff.id}
+                                  interactive
+                                  className={isSelected ? 'bg-amber-50/50' : undefined}
                                 >
-                                  <Avatar name={staff.fullName} src={staff.avatarUrl} size="sm" />
-                                  <div>
-                                    <span className="font-semibold text-zinc-900 block">{staff.fullName}</span>
-                                    <span className="text-[11px] text-zinc-400 block">{staff.employeeId}</span>
-                                  </div>
-                                </Link>
-                              </TD>
-                              <TD className="text-xs text-zinc-700">{staff.position}</TD>
-                              <TD hideBelow="md" className="text-xs text-zinc-500">{staff.branchName}</TD>
-                              <TD align="center">
-                                <AccountStatusBadge status={staff.status} />
-                              </TD>
-                              <TD hideBelow="sm" className="text-xs text-zinc-500">
-                                {formatDate(staff.createdAt)}
-                              </TD>
-                              <TD align="right">
-                                <div className="flex items-center justify-end gap-1.5">
-                                  {staff.role === 'customer_experience_manager' ? (
-                                    <>
-                                      <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => {
-                                          setAssignCemUser(staff);
-                                          setCemScopeType(staff.scope?.scopeType || 'branch');
-                                          setCemAllowedPositions(staff.scope?.allowedPositions || []);
-                                          setCemAllowedStaffIds(staff.scope?.allowedStaffIds || []);
-                                        }}
-                                      >
-                                        Scope
-                                      </Button>
+                                  <TD align="center" className="w-10">
+                                    <input
+                                      type="checkbox"
+                                      aria-label={`Select ${staff.fullName}`}
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        if (e.target.checked) {
+                                          setSelectedStaffIds((prev) => [...prev, staff.id]);
+                                        } else {
+                                          setSelectedStaffIds((prev) =>
+                                            prev.filter((id) => id !== staff.id),
+                                          );
+                                        }
+                                      }}
+                                      className="size-4 rounded border-zinc-300 text-gold-600 focus:ring-gold-500 cursor-pointer"
+                                    />
+                                  </TD>
+                                  <TD>
+                                    <Link
+                                      to={paths.manager.staffDetail(staff.id)}
+                                      className="flex items-center gap-2.5 hover:underline"
+                                    >
+                                      <Avatar name={staff.fullName} src={staff.avatarUrl} size="sm" />
+                                      <div>
+                                        <span className="font-semibold text-zinc-900 block">{staff.fullName}</span>
+                                        <span className="text-[11px] text-zinc-400 block">{staff.employeeId}</span>
+                                      </div>
+                                    </Link>
+                                  </TD>
+                                  <TD className="text-xs text-zinc-700">{staff.position}</TD>
+                                  <TD hideBelow="md" className="text-xs text-zinc-500">{staff.branchName}</TD>
+                                  <TD align="center">
+                                    <AccountStatusBadge status={staff.status} />
+                                  </TD>
+                                  <TD hideBelow="sm" className="text-xs text-zinc-500">
+                                    {formatDate(staff.createdAt)}
+                                  </TD>
+                                  <TD align="right">
+                                    <div className="flex items-center justify-end gap-1.5">
+                                      {staff.role === 'customer_experience_manager' ? (
+                                        <>
+                                          <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={() => {
+                                              setAssignCemUser(staff);
+                                              setSelectedCemStaffId(staff.id);
+                                              setCemScopeType(staff.scope?.scopeType || 'branch');
+                                              setCemAllowedPositions(staff.scope?.allowedPositions || []);
+                                              setCemAllowedStaffIds(staff.scope?.allowedStaffIds || []);
+                                              setAssignCemModalOpen(true);
+                                            }}
+                                          >
+                                            Scope
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-amber-700 hover:bg-amber-50"
+                                            onClick={() => setRevokeCemUser(staff)}
+                                          >
+                                            Revoke CEM
+                                          </Button>
+                                        </>
+                                      ) : staff.status === 'active' ? (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-gold-700 hover:bg-gold-50"
+                                          onClick={() => {
+                                            setAssignCemUser(staff);
+                                            setSelectedCemStaffId(staff.id);
+                                            setCemScopeType('branch');
+                                            setCemAllowedPositions([]);
+                                            setCemAllowedStaffIds([]);
+                                            setAssignCemModalOpen(true);
+                                          }}
+                                        >
+                                          Assign CEM
+                                        </Button>
+                                      ) : null}
+                                      <Link to={paths.manager.staffDetail(staff.id)}>
+                                        <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
+                                          Profile
+                                        </Button>
+                                      </Link>
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-amber-700 hover:bg-amber-50"
-                                        onClick={() => setRevokeCemUser(staff)}
+                                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                        leftIcon={<Trash2 className="size-3.5" />}
+                                        onClick={() => setDeleteUser(staff)}
+                                        title="Delete staff account"
                                       >
-                                        Revoke CEM
+                                        Delete
                                       </Button>
-                                    </>
-                                  ) : staff.status === 'active' ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-gold-700 hover:bg-gold-50"
-                                      onClick={() => {
-                                        setAssignCemUser(staff);
-                                        setCemScopeType('branch');
-                                        setCemAllowedPositions([]);
-                                        setCemAllowedStaffIds([]);
-                                      }}
-                                    >
-                                      Assign CEM
-                                    </Button>
-                                  ) : null}
-                                  <Link to={paths.manager.staffDetail(staff.id)}>
-                                    <Button variant="ghost" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
-                                      Profile
-                                    </Button>
-                                  </Link>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                                    leftIcon={<Trash2 className="size-3.5" />}
-                                    onClick={() => setDeleteUser(staff)}
-                                    title="Delete staff account"
-                                  >
-                                    Delete
-                                  </Button>
-                                </div>
-                              </TD>
-                            </TR>
-                          ))}
-                        </TBody>
-                      </Table>
-                    </Card>
+                                    </div>
+                                  </TD>
+                                </TR>
+                              );
+                            })}
+                          </TBody>
+                        </Table>
+                      </Card>
+                    </div>
                   )}
                 </div>
               ) : activeTab === 'cem' ? (
                 <div className="space-y-4">
                   {/* CEM Header */}
-                  <div className="rounded-xl border border-amber-200/90 bg-amber-50/50 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-amber-200/90 bg-amber-50/50 p-4">
                     <div className="flex items-start gap-3">
                       <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gold-500 text-ink-950 font-bold">
                         <ShieldCheck className="size-5" />
@@ -501,10 +636,26 @@ export function StaffListPage() {
                       <div>
                         <h4 className="text-sm font-bold text-ink-950">Customer Experience Managers</h4>
                         <p className="mt-0.5 text-xs text-zinc-600">
-                          Customer Experience Managers interpret KPI results, provide coaching and feedback, and moderate authorized group chats within their permitted branch scope. They cannot alter KPI formulas, targets, or submitted entries.
+                          Branch Managers have executive authority to assign Customer Experience Managers from active branch personnel, configure their supervisory scope, and oversee their coaching directives.
                         </p>
                       </div>
                     </div>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      leftIcon={<Plus className="size-3.5" />}
+                      onClick={() => {
+                        setAssignCemUser(null);
+                        setSelectedCemStaffId('');
+                        setCemScopeType('branch');
+                        setCemAllowedPositions([]);
+                        setCemAllowedStaffIds([]);
+                        setAssignCemModalOpen(true);
+                      }}
+                      className="shrink-0 font-bold"
+                    >
+                      Assign Customer Experience Manager
+                    </Button>
                   </div>
 
                   {allStaff.filter((s) => s.role === 'customer_experience_manager').length === 0 ? (
@@ -512,7 +663,24 @@ export function StaffListPage() {
                       <EmptyState
                         icon={ShieldCheck}
                         title="No Customer Experience Managers assigned"
-                        description="Promote eligible branch officers from the All Staff tab to grant scoped KPI coaching and group chat moderation authority."
+                        description="As the Branch Manager, you can appoint eligible officers from the staff roster to grant scoped KPI coaching and group chat moderation authority."
+                        action={
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            leftIcon={<Plus className="size-3.5" />}
+                            onClick={() => {
+                              setAssignCemUser(null);
+                              setSelectedCemStaffId('');
+                              setCemScopeType('branch');
+                              setCemAllowedPositions([]);
+                              setCemAllowedStaffIds([]);
+                              setAssignCemModalOpen(true);
+                            }}
+                          >
+                            Assign Customer Experience Manager
+                          </Button>
+                        }
                       />
                     </Card>
                   ) : (
@@ -562,9 +730,11 @@ export function StaffListPage() {
                                       size="sm"
                                       onClick={() => {
                                         setAssignCemUser(cem);
+                                        setSelectedCemStaffId(cem.id);
                                         setCemScopeType(cem.scope?.scopeType || 'branch');
                                         setCemAllowedPositions(cem.scope?.allowedPositions || []);
                                         setCemAllowedStaffIds(cem.scope?.allowedStaffIds || []);
+                                        setAssignCemModalOpen(true);
                                       }}
                                     >
                                       Configure Scope
@@ -964,43 +1134,89 @@ export function StaffListPage() {
         description={`Are you sure you want to permanently delete ${deleteUser?.fullName}'s account (${deleteUser?.employeeId || deleteUser?.email})? All associated performance entries, feedback, and registrations will be permanently erased. This action cannot be undone.`}
         confirmLabel="Delete Account"
         destructive
-        loading={deleting}
       />
 
-      {/* Configure CEM Scope Dialog */}
+      {/* Bulk Delete Staff Confirmation Dialog */}
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Staff Accounts"
+        description={`Are you sure you want to permanently delete ${selectedStaffIds.length} selected staff member${selectedStaffIds.length > 1 ? 's' : ''}? All associated performance records, submissions, and feedback will be immediately removed. This action cannot be undone.`}
+        confirmLabel={`Delete ${selectedStaffIds.length} Account${selectedStaffIds.length > 1 ? 's' : ''}`}
+        destructive
+      />
+
+      {/* Configure / Assign CEM Scope Dialog */}
       <Dialog
-        open={Boolean(assignCemUser)}
-        onClose={() => setAssignCemUser(null)}
-        title={assignCemUser?.role === 'customer_experience_manager' ? 'Configure Manager Scope' : 'Assign Customer Experience Manager'}
-        description={`Set supervision scope for ${assignCemUser?.fullName} (${assignCemUser?.position || 'Staff'}). The manager will only be permitted to monitor KPIs, give coaching, and moderate group chats within this scope.`}
+        open={assignCemModalOpen || Boolean(assignCemUser)}
+        onClose={() => {
+          setAssignCemModalOpen(false);
+          setAssignCemUser(null);
+          setSelectedCemStaffId('');
+        }}
+        title={
+          assignCemUser?.role === 'customer_experience_manager'
+            ? 'Configure Customer Experience Manager Scope'
+            : 'Assign Customer Experience Manager'
+        }
+        description={
+          assignCemUser
+            ? `Set supervision scope for ${assignCemUser.fullName} (${assignCemUser.position || 'Staff'}). The manager will be permitted to monitor KPIs, give coaching, and moderate group chats within this scope.`
+            : 'Select an active branch staff member to appoint as Customer Experience Manager and configure their supervisory scope.'
+        }
         size="lg"
         busy={savingCem}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setAssignCemUser(null)} disabled={savingCem}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAssignCemModalOpen(false);
+                setAssignCemUser(null);
+                setSelectedCemStaffId('');
+              }}
+              disabled={savingCem}
+            >
               Cancel
             </Button>
             <Button
               variant="primary"
               loading={savingCem}
               onClick={async () => {
-                if (!assignCemUser) return;
+                const targetId = assignCemUser?.id || selectedCemStaffId;
+                if (!targetId) {
+                  showToast({
+                    tone: 'danger',
+                    title: 'Selection Required',
+                    message: 'Please select an active staff member to appoint as Customer Experience Manager.',
+                  });
+                  return;
+                }
+                const targetStaff = (state.data?.allStaff || []).find((s) => s.id === targetId);
+
                 setSavingCem(true);
                 try {
-                  await staffService.assignCem(assignCemUser.id, {
+                  await staffService.assignCem(targetId, {
                     scopeType: cemScopeType,
                     allowedPositions: cemAllowedPositions,
                     allowedStaffIds: cemAllowedStaffIds,
                   });
                   showToast({
                     tone: 'gold',
-                    title: 'Role Configured',
-                    message: `${assignCemUser.fullName} configured as Customer Experience Manager with ${cemScopeType} scope.`,
+                    title: 'Role Assigned',
+                    message: `${targetStaff?.fullName || 'Staff member'} appointed as Customer Experience Manager with ${cemScopeType} scope.`,
                   });
+                  setAssignCemModalOpen(false);
                   setAssignCemUser(null);
-                  void state.reload();
+                  setSelectedCemStaffId('');
+                  void state.reload({ silent: true });
                 } catch (err: any) {
-                  showToast({ tone: 'danger', title: 'Error', message: err?.message || 'Failed to save Customer Experience Manager scope.' });
+                  showToast({
+                    tone: 'danger',
+                    title: 'Error',
+                    message: err?.message || 'Failed to save Customer Experience Manager assignment.',
+                  });
                 } finally {
                   setSavingCem(false);
                 }
@@ -1012,6 +1228,55 @@ export function StaffListPage() {
         }
       >
         <div className="space-y-4 py-2">
+          {!assignCemUser && (
+            <Field
+              label="Select Branch Staff Member"
+              required
+              hint="Choose an active branch officer to appoint as Customer Experience Manager"
+            >
+              <Select
+                value={selectedCemStaffId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedCemStaffId(id);
+                  const found = (state.data?.allStaff || []).find((s) => s.id === id);
+                  setAssignCemUser(found || null);
+                }}
+              >
+                <option value="">-- Choose active branch employee --</option>
+                {(state.data?.allStaff || [])
+                  .filter(
+                    (s) =>
+                      s.role !== 'customer_experience_manager' &&
+                      s.role !== 'manager' &&
+                      s.status === 'active',
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.fullName} ({s.employeeId}) · {s.position}
+                    </option>
+                  ))}
+              </Select>
+            </Field>
+          )}
+
+          {assignCemUser && (
+            <div className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50/80 p-3">
+              <div className="flex items-center gap-3">
+                <Avatar name={assignCemUser.fullName} src={assignCemUser.avatarUrl} size="sm" />
+                <div>
+                  <span className="font-bold text-xs text-zinc-900 block">{assignCemUser.fullName}</span>
+                  <span className="text-[11px] text-zinc-500 font-mono">
+                    {assignCemUser.employeeId} · {assignCemUser.position}
+                  </span>
+                </div>
+              </div>
+              <span className="inline-flex items-center rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                {assignCemUser.role === 'customer_experience_manager' ? 'Active CEM' : 'Designated for CEM'}
+              </span>
+            </div>
+          )}
+
           <Field label="Scope Type">
             <Select
               value={cemScopeType}
@@ -1056,7 +1321,7 @@ export function StaffListPage() {
               <label className="text-xs font-semibold text-zinc-900">Allowed Staff Members</label>
               <div className="space-y-1.5 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 p-2.5 bg-zinc-50/50">
                 {(state.data?.allStaff || [])
-                  .filter((s: User) => s.id !== assignCemUser?.id && s.status === 'active')
+                  .filter((s: User) => s.id !== (assignCemUser?.id || selectedCemStaffId) && s.status === 'active')
                   .map((s: User) => {
                     const checked = cemAllowedStaffIds.includes(s.id);
                     return (

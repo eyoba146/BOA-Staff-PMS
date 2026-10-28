@@ -9,10 +9,13 @@ import {
   Target,
   Megaphone,
   Sparkles,
+  ClipboardList,
+  Plus,
 } from 'lucide-react';
 import { performanceService } from '@/services/performance.service';
+import { instructionService } from '@/services/instruction.service';
 import { useAsync } from '@/hooks/useAsync';
-import { todayISO } from '@/utils/date';
+import { todayISO, formatDate } from '@/utils/date';
 import { formatPercent } from '@/utils/format';
 import { paths } from '@/routes/paths';
 import type { PerformancePeriod } from '@/types';
@@ -30,7 +33,11 @@ export function ManagerDashboardPage() {
   });
 
   const loadData = useCallback(async () => {
-    return performanceService.getBranchOverview(periodState.period, periodState.date);
+    const [overview, instructions] = await Promise.all([
+      performanceService.getBranchOverview(periodState.period, periodState.date),
+      instructionService.list().catch(() => []),
+    ]);
+    return { overview, instructions };
   }, [periodState.period, periodState.date]);
 
   const state = useAsync(loadData, [loadData]);
@@ -43,8 +50,13 @@ export function ManagerDashboardPage() {
         documentTitle="Branch Dashboard"
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Link to={paths.manager.instructions} className="w-full sm:w-auto">
+              <Button variant="primary" size="sm" className="w-full sm:w-auto" leftIcon={<ClipboardList className="size-3.5" />}>
+                Daily Instructions
+              </Button>
+            </Link>
             <Link to={paths.manager.announcements} className="w-full sm:w-auto">
-              <Button variant="primary" size="sm" className="w-full sm:w-auto" leftIcon={<Megaphone className="size-3.5" />}>
+              <Button variant="secondary" size="sm" className="w-full sm:w-auto" leftIcon={<Megaphone className="size-3.5" />}>
                 Post Announcement
               </Button>
             </Link>
@@ -72,7 +84,7 @@ export function ManagerDashboardPage() {
       </div>
 
       <AsyncBoundary state={state}>
-        {(overview) => {
+        {({ overview, instructions }) => {
           const totalStaffInPeriod = Object.values(overview.statusBreakdown).reduce((a, b) => a + b, 0);
 
           return (
@@ -216,6 +228,57 @@ export function ManagerDashboardPage() {
                       }
                     />
                     <StaffPerformanceTable rows={overview.staff.slice(0, 5)} />
+                  </Card>
+
+                  {/* Daily Staff Directives Card */}
+                  <Card>
+                    <CardHeader
+                      title="Daily Staff Directives & Instructions"
+                      description="Active operational directives and instructions issued for branch staff."
+                      actions={
+                        <Link to={paths.manager.instructions}>
+                          <Button variant="primary" size="sm" leftIcon={<Plus className="size-3.5" />}>
+                            Add Daily Instruction
+                          </Button>
+                        </Link>
+                      }
+                    />
+                    <CardBody className="p-0">
+                      {instructions.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-zinc-500">
+                          No daily staff instructions have been published yet today.
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-zinc-100">
+                          {instructions.slice(0, 3).map((inst) => (
+                            <div
+                              key={inst.id}
+                              className="p-4 hover:bg-zinc-50/50 transition-colors flex items-start justify-between gap-4"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-zinc-900">{inst.title}</span>
+                                  <span className="inline-flex items-center rounded-md bg-amber-50 border border-amber-200 px-2 py-0.2 text-[10px] font-bold text-amber-900">
+                                    {inst.audience === 'all'
+                                      ? 'All Branch Staff'
+                                      : `${inst.targetStaffIds.length} Selected`}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-zinc-600 line-clamp-1">{inst.body}</p>
+                                <span className="text-[11px] text-zinc-400 block">
+                                  Issued by {inst.authorName} · {formatDate(inst.createdAt, 'short')}
+                                </span>
+                              </div>
+                              <Link to={paths.manager.instructions} className="shrink-0">
+                                <Button variant="ghost" size="sm" className="text-xs text-gold-700">
+                                  Manage
+                                </Button>
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardBody>
                   </Card>
                 </div>
 

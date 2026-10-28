@@ -191,4 +191,14 @@ export const staffController = {
       next(err);
     }
   },
+
+  async deleteMany(req: Request, res: Response, next: NextFunction) {
+    try {
+      const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
+      const result = await staffService.deleteMany(ids, req.user?.userId, req.ip);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
 };

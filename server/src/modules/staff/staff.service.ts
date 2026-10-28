@@ -380,6 +380,25 @@ export const staffService = {
     invalidateStaffCache();
   },
 
+  async deleteMany(ids: string[], managerId?: string, ipAddress?: string): Promise<{ deletedCount: number }> {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return { deletedCount: 0 };
+    }
+
+    const deletedCount = await userRepository.deleteManyStaff(ids);
+
+    await recordAudit({
+      action: 'STAFF_BULK_DELETED',
+      actorId: managerId,
+      details: { deletedIds: ids, deletedCount },
+      ipAddress,
+    });
+
+    invalidateOverviewCache();
+    invalidateStaffCache();
+    return { deletedCount };
+  },
+
   async assignCem(
     staffId: string,
     managerId: string,

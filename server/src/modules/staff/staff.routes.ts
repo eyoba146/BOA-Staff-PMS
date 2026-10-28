@@ -71,6 +71,13 @@ staffRouter.patch(
   staffController.setStatus,
 );
 
+staffRouter.post(
+  '/delete-many',
+  requireAuth,
+  requireManager,
+  staffController.deleteMany,
+);
+
 staffRouter.delete(
   '/:id',
   requireAuth,

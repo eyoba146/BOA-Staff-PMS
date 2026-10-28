@@ -722,6 +722,16 @@ export const userRepository = {
     return true;
   },
 
+  async deleteManyStaff(ids: string[]): Promise<number> {
+    if (!ids || ids.length === 0) return 0;
+    let deletedCount = 0;
+    for (const id of ids) {
+      const ok = await this.deleteStaff(id);
+      if (ok) deletedCount++;
+    }
+    return deletedCount;
+  },
+
   async assignCemRole(
     id: string,
     assignedById: string,

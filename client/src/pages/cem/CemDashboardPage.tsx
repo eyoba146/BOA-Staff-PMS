@@ -8,11 +8,13 @@ import {
   MessageSquareText,
   MessagesSquare,
   Plus,
+  ClipboardList,
 } from 'lucide-react';
 import { performanceService } from '@/services/performance.service';
 import { staffService } from '@/services/staff.service';
 import { feedbackService } from '@/services/feedback.service';
 import { kpiService } from '@/services/kpi.service';
+import { instructionService } from '@/services/instruction.service';
 import { useAsync } from '@/hooks/useAsync';
 import { useToast } from '@/context/ToastContext';
 import { todayISO, formatDate } from '@/utils/date';
@@ -36,11 +38,12 @@ export function CemDashboardPage() {
   const [feedbackTargetStaffId, setFeedbackTargetStaffId] = useState<string | undefined>(undefined);
 
   const loadData = useCallback(async () => {
-    const [overview, inScopeStaff, feedbackList, kpis] = await Promise.all([
+    const [overview, inScopeStaff, feedbackList, kpis, instructions] = await Promise.all([
       performanceService.getBranchOverview(periodState.period, periodState.date).catch(() => null),
       staffService.listInScope(),
       feedbackService.list(),
       kpiService.list().catch(() => []),
+      instructionService.list().catch(() => []),
     ]);
 
     return {
@@ -48,6 +51,7 @@ export function CemDashboardPage() {
       inScopeStaff,
       feedbackList,
       kpis,
+      instructions,
     };
   }, [periodState.period, periodState.date]);
 
@@ -80,8 +84,13 @@ export function CemDashboardPage() {
         documentTitle="Customer Experience Portal"
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Link to={paths.cem.instructions}>
+              <Button variant="primary" size="sm" leftIcon={<ClipboardList className="size-3.5" />}>
+                Add Daily Instruction
+              </Button>
+            </Link>
             <Button
-              variant="primary"
+              variant="secondary"
               size="sm"
               leftIcon={<Plus className="size-3.5" />}
               onClick={() => {
@@ -101,7 +110,7 @@ export function CemDashboardPage() {
       />
 
       <AsyncBoundary state={state}>
-        {({ overview, inScopeStaff, feedbackList, kpis }) => {
+        {({ overview, inScopeStaff, feedbackList, kpis, instructions }) => {
           const inScopeIds = new Set(inScopeStaff.map((s) => s.id));
           const filteredStaffPerformance = overview?.staff?.filter((s) => inScopeIds.has(s.staffId)) || [];
           
@@ -248,6 +257,72 @@ export function CemDashboardPage() {
                               ) : (
                                 <span className="text-zinc-400 italic">Awaiting response</span>
                               )}
+                            </TD>
+                          </TR>
+                        ))}
+                      </TBody>
+                    </Table>
+                  )}
+                </CardBody>
+              </Card>
+
+              {/* Daily Staff Instructions & Directives Card */}
+              <Card>
+                <CardHeader
+                  title="Daily Staff Directives & Instructions"
+                  description="Operational directives, daily branch focus areas, and priority tasks issued to supervised staff."
+                  actions={
+                    <div className="flex items-center gap-2">
+                      <Link to={paths.cem.instructions}>
+                        <Button variant="primary" size="sm" leftIcon={<Plus className="size-3.5" />}>
+                          Add Daily Instruction
+                        </Button>
+                      </Link>
+                    </div>
+                  }
+                />
+                <CardBody className="p-0">
+                  {instructions.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-zinc-500">
+                      No daily staff instructions have been published yet today.
+                    </div>
+                  ) : (
+                    <Table>
+                      <THead>
+                        <TR>
+                          <TH>Directive Title</TH>
+                          <TH>Target Audience</TH>
+                          <TH>Issued By</TH>
+                          <TH>Date & Time</TH>
+                          <TH align="right">Action</TH>
+                        </TR>
+                      </THead>
+                      <TBody>
+                        {instructions.slice(0, 5).map((inst) => (
+                          <TR key={inst.id} interactive>
+                            <TD>
+                              <div className="font-semibold text-zinc-900 text-xs">{inst.title}</div>
+                              <div className="text-[11px] text-zinc-500 line-clamp-1">{inst.body}</div>
+                            </TD>
+                            <TD>
+                              <span className="inline-flex items-center rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                                {inst.audience === 'all'
+                                  ? 'All Branch Staff'
+                                  : `${inst.targetStaffIds.length} Selected Officers`}
+                              </span>
+                            </TD>
+                            <TD className="text-xs text-zinc-700 font-medium">
+                              {inst.authorName}
+                            </TD>
+                            <TD className="text-xs text-zinc-500 whitespace-nowrap">
+                              {formatDate(inst.createdAt, 'short')}
+                            </TD>
+                            <TD align="right">
+                              <Link to={paths.cem.instructions}>
+                                <Button variant="ghost" size="sm" className="text-gold-700 hover:text-gold-800">
+                                  View Details
+                                </Button>
+                              </Link>
                             </TD>
                           </TR>
                         ))}

@@ -29,6 +29,8 @@ export interface StaffService {
   verifyEmailChange(newEmail: string, code: string): Promise<User>;
   /** Permanently delete staff member and associated records (Manager only). */
   delete(id: string): Promise<void>;
+  /** Bulk delete multiple staff members instantly (Manager only). */
+  deleteMany(ids: string[]): Promise<void>;
   /** Customer Experience Manager management */
   listCem(): Promise<User[]>;
   listInScope(): Promise<User[]>;
@@ -51,6 +53,7 @@ const httpStaffService: StaffService = {
   requestEmailChange: (newEmail) => api.post('/staff/email/request', { newEmail }),
   verifyEmailChange: (newEmail, code) => api.post<User>('/staff/email/verify', { newEmail, code }),
   delete: (id) => api.delete<void>(`/staff/${id}`),
+  deleteMany: (ids) => api.post<void>('/staff/delete-many', { ids }),
   listCem: () => api.get<User[]>('/staff/cem'),
   listInScope: () => api.get<User[]>('/staff/in-scope'),
   assignCem: (id, scope) => api.post<User>(`/staff/${id}/assign-cem`, scope ?? {}),
@@ -224,6 +227,17 @@ const mockStaffService: StaffService = {
     db.assignments = db.assignments.filter((a) => a.staffId !== id);
     db.entries = db.entries.filter((e) => e.staffId !== id);
     db.feedback = db.feedback.filter((f) => f.staffId !== id && f.managerId !== id);
+    commit();
+  },
+  async deleteMany(ids: string[]) {
+    await delay(200);
+    requireManager();
+    const db = getDb();
+    const idSet = new Set(ids);
+    db.users = db.users.filter((u) => !idSet.has(u.id));
+    db.assignments = db.assignments.filter((a) => !idSet.has(a.staffId));
+    db.entries = db.entries.filter((e) => !idSet.has(e.staffId));
+    db.feedback = db.feedback.filter((f) => !idSet.has(f.staffId) && !idSet.has(f.managerId));
     commit();
   },
   async listCem() {

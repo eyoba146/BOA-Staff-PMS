@@ -9,12 +9,14 @@ import {
   MessageSquareText,
   TrendingUp,
   Sparkles,
+  ClipboardList,
 } from 'lucide-react';
 import { useCurrentUser } from '@/context/AuthContext';
 import { useAsync } from '@/hooks/useAsync';
 import { performanceService } from '@/services/performance.service';
 import { feedbackService } from '@/services/feedback.service';
 import { announcementService } from '@/services/announcement.service';
+import { instructionService } from '@/services/instruction.service';
 import { kpiService } from '@/services/kpi.service';
 import { todayISO, formatDate } from '@/utils/date';
 import { formatPercent } from '@/utils/format';
@@ -41,6 +43,7 @@ import {
 interface SupportingData {
   feedbackList: Awaited<ReturnType<typeof feedbackService.listMine>>;
   announcementsList: Awaited<ReturnType<typeof announcementService.list>>;
+  instructionsList: Awaited<ReturnType<typeof instructionService.list>>;
   assignedKpis: Awaited<ReturnType<typeof kpiService.getMyAssignedKpis>>;
   todaySubmittedCount: number;
   isTodayComplete: boolean;
@@ -61,16 +64,18 @@ export function StaffDashboardPage() {
   const performanceState = useAsync(loadPerformance, [loadPerformance]);
 
   const loadSupporting = useCallback(async (): Promise<SupportingData> => {
-    const [feedbackList, announcementsList, assignedKpis] = await Promise.all([
+    const [feedbackList, announcementsList, assignedKpis, instructionsList] = await Promise.all([
       feedbackService.listMine(),
       announcementService.list(),
       kpiService.getMyAssignedKpis(todayISO()),
+      instructionService.list().catch(() => []),
     ]);
     const todaySubmittedCount = assignedKpis.filter((kpi) => kpi.entry !== null).length;
     return {
       feedbackList: feedbackList.slice(0, 3),
       unreadFeedbackCount: feedbackList.filter((feedback) => !feedback.readAt).length,
       announcementsList: announcementsList.slice(0, 3),
+      instructionsList: instructionsList.slice(0, 3),
       assignedKpis,
       todaySubmittedCount,
       isTodayComplete: assignedKpis.length > 0 && todaySubmittedCount === assignedKpis.length,
@@ -153,6 +158,43 @@ export function StaffDashboardPage() {
                 rightIcon={<ArrowRight className="size-4" />}
               >
                 {supportingData.isTodayComplete ? 'Review / Update Entry' : 'Record Daily Entry'}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Staff Directives & Instructions */}
+      {supportingData && supportingData.instructionsList.length > 0 && (
+        <div className="rounded-xl border border-amber-300/80 bg-gradient-to-r from-amber-500/10 via-amber-50/40 to-white p-4.5 sm:p-5 shadow-xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3.5">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gold-500 text-ink-950 font-bold shadow-xs">
+                <ClipboardList className="size-5" />
+              </span>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-950 bg-amber-400/30 border border-amber-300/60 px-2 py-0.5 rounded-md">
+                    Daily Staff Directive
+                  </span>
+                  <span className="text-xs text-zinc-500">
+                    {formatDate(supportingData.instructionsList[0].createdAt, 'short')}
+                  </span>
+                </div>
+                <h4 className="text-sm font-bold text-ink-950">
+                  {supportingData.instructionsList[0].title}
+                </h4>
+                <p className="text-xs text-zinc-700 leading-relaxed max-w-2xl line-clamp-2">
+                  {supportingData.instructionsList[0].body}
+                </p>
+                <div className="text-[11px] text-zinc-500 pt-0.5">
+                  Issued by <strong className="text-zinc-800">{supportingData.instructionsList[0].authorName}</strong>
+                </div>
+              </div>
+            </div>
+            <Link to={paths.staff.instructions} className="shrink-0">
+              <Button variant="secondary" size="sm" rightIcon={<ArrowRight className="size-3.5" />}>
+                View Instructions ({supportingData.instructionsList.length})
               </Button>
             </Link>
           </div>
