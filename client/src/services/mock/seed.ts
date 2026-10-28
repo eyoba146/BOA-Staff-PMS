@@ -50,6 +50,16 @@ export interface StoredAnnouncement {
   readBy: string[];
 }
 
+export interface StoredInstruction {
+  id: string;
+  title: string;
+  body: string;
+  audience: 'all' | 'selected';
+  targetStaffIds: string[];
+  authorName: string;
+  createdAt: string;
+}
+
 export interface StoredConversation {
   id: string;
   type: 'branch' | 'direct';
@@ -71,6 +81,7 @@ export interface MockDb {
   conversations: StoredConversation[];
   messages: ChatMessage[];
   settings: SystemSettings;
+  instructions?: StoredInstruction[];
 }
 
 export const MOCK_DB_VERSION = 2;

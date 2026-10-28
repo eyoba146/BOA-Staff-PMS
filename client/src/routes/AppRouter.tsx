@@ -34,11 +34,13 @@ import { ReportsPage } from '@/pages/manager/ReportsPage';
 import { ManagerFeedbackPage } from '@/pages/manager/ManagerFeedbackPage';
 import { ManagerAnnouncementsPage } from '@/pages/manager/ManagerAnnouncementsPage';
 import { SettingsPage } from '@/pages/manager/SettingsPage';
-
 // Customer Experience Manager pages
 import { CemDashboardPage } from '@/pages/cem/CemDashboardPage';
 import { CemStaffListPage } from '@/pages/cem/CemStaffListPage';
 
+// Daily Staff Instructions pages
+import { StaffInstructionsPage } from '@/pages/staff/StaffInstructionsPage';
+import { ManagerInstructionsPage } from '@/pages/manager/ManagerInstructionsPage';
 export function AppRouter() {
   return (
     <Routes>
@@ -67,6 +69,7 @@ export function AppRouter() {
             <Route path={paths.staff.performance} element={<StaffPerformancePage />} />
             <Route path={paths.staff.feedback} element={<StaffFeedbackPage />} />
             <Route path={paths.staff.announcements} element={<AnnouncementsPage />} />
+            <Route path={paths.staff.instructions} element={<StaffInstructionsPage />} />
             <Route path={paths.staff.chat} element={<ChatPage />} />
             <Route path={paths.staff.profile} element={<ProfilePage />} />
           </Route>
@@ -77,6 +80,7 @@ export function AppRouter() {
             <Route path={paths.cem.staff} element={<CemStaffListPage />} />
             <Route path="/cem/staff/:staffId" element={<StaffDetailPage />} />
             <Route path={paths.cem.feedback} element={<ManagerFeedbackPage />} />
+            <Route path={paths.cem.instructions} element={<ManagerInstructionsPage />} />
             <Route path={paths.cem.chat} element={<ChatPage />} />
             <Route path={paths.cem.profile} element={<ProfilePage />} />
           </Route>
@@ -92,6 +96,7 @@ export function AppRouter() {
             <Route path={paths.manager.reports} element={<ReportsPage />} />
             <Route path={paths.manager.feedback} element={<ManagerFeedbackPage />} />
             <Route path={paths.manager.announcements} element={<ManagerAnnouncementsPage />} />
+           <Route path={paths.manager.instructions} element={<ManagerInstructionsPage />} />
             <Route path={paths.manager.chat} element={<ChatPage />} />
             <Route path={paths.manager.settings} element={<SettingsPage />} />
           </Route>

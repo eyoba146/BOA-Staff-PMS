@@ -134,3 +134,22 @@ export interface SystemSettings {
   };
   weightingEnabled: boolean;
 }
+
+export type InstructionAudience = 'all' | 'selected';
+
+export interface DailyInstruction {
+  id: string;
+  title: string;
+  body: string;
+  audience: InstructionAudience;
+  targetStaffIds: string[];
+  authorName: string;
+  createdAt: string;
+}
+
+export interface DailyInstructionInput {
+  title: string;
+  body: string;
+  audience: InstructionAudience;
+  targetStaffIds: string[];
+}

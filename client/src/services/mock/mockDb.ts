@@ -24,10 +24,18 @@ function load(): MockDb {
   return seed;
 }
 
+
 export function getDb(): MockDb {
   if (!db) db = load();
+
+  // Backward-compatible initialization for existing saved demo data.
+  if (!db.instructions) {
+    db.instructions = [];
+  }
+
   return db;
 }
+
 
 /** Persist after a mutation. */
 export function commit(): void {
@@ -52,3 +60,17 @@ export const mockSession = {
     sessionStorage.removeItem(SESSION_KEY);
   },
 };
+export function diagnoseMockLogin() {
+  const database = getDb();
+  const manager = database.users.find(
+    (user) => user.employeeId.toLowerCase() === 'boa-m001',
+  );
+
+  return {
+    databaseVersion: database.version,
+    userCount: database.users.length,
+    managerFound: Boolean(manager),
+    managerStatus: manager?.status ?? 'not found',
+    passwordMatchesDemo: manager?.password === 'Demo@1234',
+  };
+}
